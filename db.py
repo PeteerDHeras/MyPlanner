@@ -28,9 +28,132 @@ def registrar_usuario(nombre, contraseña, rol_id):
 def verificar_usuario(nombre, contraseña):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT password FROM usuario WHERE usuario=%s", (nombre,))
+    cursor.execute("SELECT password FROM USUARIO WHERE usuario=%s", (nombre,))
     result = cursor.fetchone()
     conn.close()
     if result and bcrypt.checkpw(contraseña.encode('utf-8'), result[0].encode('utf-8')):
         return True
     return False
+
+# CREAR TAREA
+def crear_tarea(nombre, descripcion, fecha_limite, prioridad, creador_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO TAREAS (Nombre, Descripcion, Fecha_creacion, Fecha_limite, Prioridad, creadorTarea)
+        VALUES (%s, %s, CURDATE(), %s, %s, %s)
+    """
+    cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id))
+    conn.commit()
+    conn.close()
+
+# MODIFICAR TAREA
+def modificar_tarea(tarea_id, nombre, descripcion, fecha_limite, prioridad):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        UPDATE TAREAS
+        SET Nombre=%s, Descripcion=%s, Fecha_limite=%s, Prioridad=%s
+        WHERE ID=%s
+    """
+    cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, tarea_id))
+    conn.commit()
+    conn.close()
+
+# ELIMINAR TAREA
+def eliminar_tarea(tarea_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM TAREAS WHERE ID=%s", (tarea_id,))
+    conn.commit()
+    conn.close()
+# OBTENER TAREAS
+def obtener_tareas():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM TAREAS")
+    tareas = cursor.fetchall()
+    conn.close()
+    return tareas
+
+# CREAR EVENTO
+def crear_evento(nombre, fecha_evento, hora_evento, creador_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO EVENTOS (Nombre, Fecha_creacion, Fecha_evento, Hora_evento, creadorEvento)
+        VALUES (%s, CURDATE(), %s, %s, %s)
+    """
+    cursor.execute(query, (nombre, fecha_evento, hora_evento, creador_id))
+    conn.commit()
+    conn.close()
+
+# MODIFICAR EVENTO
+def modificar_evento(evento_id, nombre, fecha_evento, hora_evento):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        UPDATE EVENTOS
+        SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s
+        WHERE ID=%s
+    """
+    cursor.execute(query, (nombre, fecha_evento, hora_evento, evento_id))
+    conn.commit()
+    conn.close()
+
+# ELIMINAR EVENTO
+def eliminar_evento(evento_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
+    conn.commit()
+    conn.close()
+# OBTENER EVENTOS
+def obtener_eventos():  
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM EVENTOS")
+    eventos = cursor.fetchall()
+    conn.close()
+    return eventos
+
+# CREAR SUBTAREA
+def crear_subtarea(nombre, descripcion, fecha_limite, tarea_padre_id, creador_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO SUBTAREAS (Nombre, Descripcion, Fecha_limite, tareaPadre, creadorSub)
+        VALUES (%s, %s, %s, %s, %s)
+    """
+    cursor.execute(query, (nombre, descripcion, fecha_limite, tarea_padre_id, creador_id))
+    conn.commit()
+    conn.close()
+
+# MODIFICAR SUBTAREA
+def modificar_subtarea(subtarea_id, nombre, descripcion, fecha_limite):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        UPDATE SUBTAREAS
+        SET Nombre=%s, Descripcion=%s, Fecha_limite=%s
+        WHERE ID=%s
+    """
+    cursor.execute(query, (nombre, descripcion, fecha_limite, subtarea_id))
+    conn.commit()
+    conn.close()
+
+# ELIMINAR SUBTAREA
+def eliminar_subtarea(subtarea_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM SUBTAREAS WHERE ID=%s", (subtarea_id,))
+    conn.commit()
+    conn.close()
+# OBTENER SUBTAREAS
+def obtener_subtareas():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM SUBTAREAS")
+    subtareas = cursor.fetchall()
+    conn.close()
+    return subtareas
