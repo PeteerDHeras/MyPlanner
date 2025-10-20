@@ -131,6 +131,8 @@ def obtener_eventos():
     eventos = cursor.fetchall()
     conn.close()
     return eventos
+    
+# FUNCIONES PARA GESTIONAR SUBATREAS ------------------------------
 
 # FUNCIONES PARA GESTIONAR SUBTAREAS ------------------------------
 
