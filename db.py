@@ -128,10 +128,11 @@ def eliminar_evento(evento_id):
 def obtener_eventos():  
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM EVENTOS")
+    cursor.execute("SELECT * FROM EVENTOS ORDER BY Fecha_evento ASC, Hora_evento ASC")
     eventos = cursor.fetchall()
     conn.close()
     return eventos
+
     
 # FUNCIONES PARA GESTIONAR SUBATREAS ------------------------------
 

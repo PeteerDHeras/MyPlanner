@@ -19,7 +19,7 @@ def login_required(f):
 
 @app.route('/')
 def home():
-    return render_template('base.html')
+    return redirect(url_for('dashboard'))
 
 # ------------------ AUTENTICACIÓN ------------------
 
@@ -39,66 +39,41 @@ def logout():
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
+# ----------------- DASHBOARD -----------------
+
 @app.route('/dashboard')
 # @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
 def dashboard():
-    return render_template('dashboard.html')
+    # Mostrar resumen con algunos eventos recientes
+    eventos = obtener_eventos()
+    tareas = []
+    try:
+        tareas = obtener_tareas()
+    except Exception:
+        # Si la función no existe o falla, seguimos con una lista vacía
+        tareas = []
 
-# ------------------ TAREAS ------------------
+    # pasar una lista corta de eventos y tareas al dashboard
+    return render_template('dashboard.html', eventos=eventos[:5], tareas=tareas[:5])
 
-@app.route('/tareas')
+# ----------------- CALENDARIO ----------------
+
+@app.route('/calendar')
 # @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
-def ver_tareas():
-    tareas = obtener_tareas()
-    return render_template('tareas.html', tareas=tareas)
+def calendar():
+    # Página con FullCalendar; los eventos se obtienen desde /api/eventos
+    return render_template('calendar.html')
 
-@app.route('/tareas/nueva', methods=['GET', 'POST'])
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
-def crear_tarea_view():
-    if request.method == 'POST':
-        usuario_actual = session.get('usuario')
-        user = obtener_usuario_por_nombre(usuario_actual)
-        creador_id = user['ID'] if user else 1
-
-        crear_tarea(
-            request.form['nombre'],
-            request.form['descripcion'],
-            request.form['fecha_limite'],
-            request.form['prioridad'],
-            creador_id
-        )
-        return redirect(url_for('ver_tareas'))
-    return render_template('nueva_tarea.html')
-
-@app.route('/tareas/<int:id>/editar', methods=['GET', 'POST'])
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
-def editar_tarea_view(id):
-    tarea = next((t for t in obtener_tareas() if t['ID'] == id), None)
-    if request.method == 'POST':
-        modificar_tarea(
-            id,
-            request.form['nombre'],
-            request.form['descripcion'],
-            request.form['fecha_limite'],
-            request.form['prioridad']
-        )
-        return redirect(url_for('ver_tareas'))
-    return render_template('editar_tarea.html', tarea=tarea)
-
-@app.route('/tareas/<int:id>/eliminar', methods=['POST'])
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
-def eliminar_tarea_view(id):
-    eliminar_tarea(id)
-    return redirect(url_for('ver_tareas'))
 
 # ------------------ EVENTOS ------------------
 
+# Ver todos los eventos
 @app.route('/eventos')
 def ver_eventos():
     eventos = obtener_eventos()
     return render_template('eventos.html', eventos=eventos)
 
-
+# Crear nuevo evento
 @app.route('/eventos/nuevo', methods=['GET', 'POST'])
 def crear_evento_view():
     if request.method == 'POST':
@@ -124,7 +99,7 @@ def crear_evento_view():
     return render_template('nuevo_evento.html', fecha_preseleccionada=fecha_preseleccionada)
 
 
-
+# Editar evento
 @app.route('/eventos/<int:id>/editar', methods=['GET', 'POST'])
 def editar_evento_view(id):
     evento = next((e for e in obtener_eventos() if e['ID'] == id), None)
@@ -147,11 +122,34 @@ def editar_evento_view(id):
 
     return render_template('editar_evento.html', evento=evento)
 
-
+# Eliminar evento
 @app.route('/eventos/<int:id>/eliminar', methods=['POST'])
 def eliminar_evento_view(id):
     eliminar_evento(id)
     return redirect(url_for('ver_eventos'))
+
+
+
+# MAPEO EN INGLES
+@app.route('/events')
+def events():
+    # Use existing Spanish view
+    return redirect(url_for('ver_eventos'))
+
+
+@app.route('/events/new', methods=['GET', 'POST'])
+def new_event():
+    return crear_evento_view()
+
+
+@app.route('/events/<int:id>/edit', methods=['GET', 'POST'])
+def edit_event(id):
+    return editar_evento_view(id)
+
+
+@app.route('/events/<int:id>/delete', methods=['POST'])
+def delete_event(id):
+    return eliminar_evento_view(id)
 
 
 # ------------------ API JSON ------------------
@@ -180,8 +178,6 @@ def api_eventos():
 
     return jsonify(eventos_json)
 
-
-
 @app.route('/api/eventos/<int:evento_id>', methods=['PUT'])
 def actualizar_evento_api(evento_id):
     data = request.get_json()
@@ -203,47 +199,57 @@ def actualizar_evento_api(evento_id):
         hora_fin
     )
     return jsonify({"message": "Evento actualizado correctamente"}), 200
-# ------------------ SUBTAREAS ------------------
+
+
+
+
+
+
+
+
+
+
+
+# ------------------ TAREAS (Archivadas) ------------------
+# Las rutas de tareas/subtareas se han simplificado/archivado temporalmente.
+# Si se accede a alguna de estas rutas serán redirigidas al dashboard.
+
+@app.route('/tareas')
+def ver_tareas():
+    return redirect(url_for('dashboard'))
+
+@app.route('/tareas/nueva', methods=['GET', 'POST'])
+def crear_tarea_view():
+    return redirect(url_for('dashboard'))
+
+@app.route('/tareas/<int:id>/editar', methods=['GET', 'POST'])
+def editar_tarea_view(id):
+    return redirect(url_for('dashboard'))
+
+@app.route('/tareas/<int:id>/eliminar', methods=['POST'])
+def eliminar_tarea_view(id):
+    return redirect(url_for('dashboard'))
+
+
+
+# ------------------ SUBTAREAS (Archivadas) ------------------
+# Rutas de subtareas deshabilitadas temporalmente; redirigen al dashboard.
 
 @app.route('/subtareas')
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
 def ver_subtareas():
-    subtareas = obtener_subtareas()
-    return render_template('subtareas.html', subtareas=subtareas)
+    return redirect(url_for('dashboard'))
 
 @app.route('/subtareas/nueva', methods=['GET', 'POST'])
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
 def crear_subtarea_view():
-    if request.method == 'POST':
-        crear_subtarea(
-            request.form['nombre'],
-            request.form['descripcion'],
-            request.form['fecha_limite'],
-            request.form['tarea_padre_id'],
-            1
-        )
-        return redirect(url_for('ver_subtareas'))
-    return render_template('nueva_subtarea.html')
+    return redirect(url_for('dashboard'))
 
 @app.route('/subtareas/<int:id>/editar', methods=['GET', 'POST'])
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
 def editar_subtarea_view(id):
-    subtarea = next((s for s in obtener_subtareas() if s['ID'] == id), None)
-    if request.method == 'POST':
-        modificar_subtarea(
-            id,
-            request.form['nombre'],
-            request.form['descripcion'],
-            request.form['fecha_limite']
-        )
-        return redirect(url_for('ver_subtareas'))
-    return render_template('editar_subtarea.html', subtarea=subtarea)
+    return redirect(url_for('dashboard'))
 
 @app.route('/subtareas/<int:id>/eliminar', methods=['POST'])
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
 def eliminar_subtarea_view(id):
-    eliminar_subtarea(id)
-    return redirect(url_for('ver_subtareas'))
+    return redirect(url_for('dashboard'))
 
 # ------------------ INICIO ------------------
 
