@@ -27,7 +27,7 @@
                     <div class="rounded-circle"
                         style="width:48px; height:48px; background-size:cover; background-position:center; background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC8w4gQAUyg__Pz5qUJG_E3XTetshO4_YIKFMqQKyOOBlh6o2nVxUlpwcK8JyDMCcUF8NneXp_NFdOXFCTSluwSVi96yPDxjCr4_bA9NhMlxZ6IECv90ys-HxLlB4GqnZAtAG6HUOagtP9ZaHHUOSQokZLtU3FRXAdnI79j-54cE77VNZT2B_vlkf9VOlCVX2nAxdiIjDDpe2LlA52k_A3GnIB5zIhg6KPjO6tcx0bMZclABUUuDnlL5g-EF9gjDyOI9VX7wzjF-pk');">
                     </div>
-                    <h1 class="h6 mb-0">MyPlanner</h1>
+                    <h1 class="h6 mb-0"><strong>{{ session['usuario'] }}</strong></h1>
                 </div>
 
                 <nav aria-label="Main navigation">
@@ -53,7 +53,6 @@
 
                         <li class="nav-item mt-3">
                             {% if session.get('usuario') %}
-                            <div class="text-light mb-2">Hola, <strong>{{ session['usuario'] }}</strong></div>
                             <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100">Cerrar sesión</a>
                             {% else %}
                             <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100">Iniciar sesión</a>
