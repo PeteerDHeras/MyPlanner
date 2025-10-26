@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}MyPlanner{% endblock %}</title>
@@ -13,37 +14,74 @@
     <!-- FullCalendar CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/bootstrap5@6.1.15/index.global.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
-    
+
 
 </head>
+
 <body class="bg-light text-light">
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color:#414141;">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('home') }}">MyPlanner</a>
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Calendario</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('ver_tareas') }}">Tareas</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('ver_eventos') }}">Eventos</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('ver_subtareas') }}">Subtareas</a></li>
-                </ul>
-                {% if session.get('usuario') %}
-                    <span class="navbar-text me-3">Hola, {{ session['usuario'] }}</span>
-                    <a class="btn btn-outline-light" href="{{ url_for('logout') }}">Cerrar sesión</a>
-                {% else %}
-                    <a class="btn btn-outline-light" href="{{ url_for('login') }}">Iniciar sesión</a>
-                {% endif %}
+    <div class="d-flex" style="min-height:100vh;">
+        <aside role="complementary" aria-label="Sidebar" class="bg-dark text-light flex-shrink-0 p-3"
+            style="width:16rem;">
+            <div class="d-flex flex-column" style="gap:.75rem;">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div class="rounded-circle"
+                        style="width:48px; height:48px; background-size:cover; background-position:center; background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC8w4gQAUyg__Pz5qUJG_E3XTetshO4_YIKFMqQKyOOBlh6o2nVxUlpwcK8JyDMCcUF8NneXp_NFdOXFCTSluwSVi96yPDxjCr4_bA9NhMlxZ6IECv90ys-HxLlB4GqnZAtAG6HUOagtP9ZaHHUOSQokZLtU3FRXAdnI79j-54cE77VNZT2B_vlkf9VOlCVX2nAxdiIjDDpe2LlA52k_A3GnIB5zIhg6KPjO6tcx0bMZclABUUuDnlL5g-EF9gjDyOI9VX7wzjF-pk');">
+                    </div>
+                    <h1 class="h6 mb-0"><strong>{{ session['usuario'] }}</strong></h1>
+                </div>
+
+                <nav aria-label="Main navigation">
+                    <ul class="nav nav-pills flex-column">
+                        <li class="nav-item mb-1">
+                            <a href="{{ url_for('dashboard') }}" class="nav-link text-light sidebar-link">
+                                <i class="fa fa-chart-pie me-2" aria-hidden="true"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item mb-1">
+                            <a href="{{ url_for('calendar') }}" class="nav-link text-light sidebar-link">
+                                <i class="fa fa-calendar me-2" aria-hidden="true"></i>
+                                <span>Calendario</span>
+                            </a>
+                        </li>
+                        <li class="nav-item mb-1">
+                            <a href="{{ url_for('events') }}" class="nav-link text-light sidebar-link">
+                                <i class="fa fa-calendar-day me-2" aria-hidden="true"></i>
+                                <span>Eventos</span>
+                            </a>
+                        </li>
+
+                        <li class="nav-item mt-3">
+                            {% if session.get('usuario') %}
+                            <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100">Cerrar sesión</a>
+                            {% else %}
+                            <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100">Iniciar sesión</a>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </nav>
             </div>
-        </div>
-    </nav>
+        </aside>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
-
+        <main class="flex-grow-1 p-1">
+            {% block content %}{% endblock %}
+            <div class="row mt-3">
+                <div class="col-12">
+                    <footer class="d-flex justify-content-between align-items-center small text-muted border-top pt-3">
+                        <div>MyPlanner • Versión 0.1</div>
+                        <div>
+                            <a href="#" class="text-muted me-3">Ayuda</a>
+                            <a href="#" class="text-muted">Contacto</a>
+                        </div>
+                    </footer>
+                </div>
+            </div>
+        </main>
+    </div>
 
 
     <!-- FullCalendar JS -->
     <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
 </body>
+
 </html>

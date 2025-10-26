@@ -1,23 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Eventos{% endblock %}
 {% block content %}
-<h2>Eventos</h2>
-<a class="btn btn-success mb-3" href="{{ url_for('crear_evento_view') }}">Crear nuevo evento</a>
-<div class="row">
-    {% for evento in eventos %}
-    <div class="col-md-6">
-        <div class="card mb-3">
-            <div class="card-body">
-                <h5 class="card-title">{{ evento.Nombre }}</h5>
-                <p class="card-text"><strong>Fecha:</strong> {{ evento.Fecha_evento }}</p>
-                <p class="card-text"><strong>Hora:</strong> {{ evento.Hora_evento }}</p>
-                <form method="POST" action="{{ url_for('eliminar_evento_view', id=evento.ID) }}">
-                    <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
-                </form>
-                <a class="btn btn-primary btn-sm" href="{{ url_for('editar_evento_view', id=evento.ID) }}">Editar</a>
+<div class="container-sm mt-4">
+    <h2 class="mb-3">Eventos</h2>
+
+    <a class="btn btn-success mb-3" href="{{ url_for('crear_evento_view') }}">Crear nuevo evento</a>
+
+    <div class="row row-cols-1 row-cols-md-2 g-3">
+        {% for evento in eventos %}
+        <div class="col">
+            <div class="card shadow-sm border-0 bg-body-secondary">
+                <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
+                    <!-- Texto del evento -->
+                    <div class="flex-grow-1">
+                        <h6 class="card-title mb-1 fw-semibold text-dark">{{ evento.Nombre }}</h6>
+                        <p class="card-text mb-0 text-secondary small">
+                            <strong>Fecha:</strong> {{ evento.Fecha_evento }} — <strong>Hora:</strong> {{
+                            evento.Hora_evento }}
+                        </p>
+                    </div>
+
+                    <!-- Botones alineados a la derecha -->
+                    <div class="d-flex flex-shrink-0 gap-2 ms-3">
+                        <a class="btn btn-outline-light btn-sm text-dark border-dark"
+                            href="{{ url_for('editar_evento_view', id=evento.ID) }}">Editar</a>
+                        <form method="POST" action="{{ url_for('eliminar_evento_view', id=evento.ID) }}" class="m-0">
+                            <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
 {% endblock %}

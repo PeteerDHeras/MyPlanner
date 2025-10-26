@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
       center: 'title', 
       right: 'dayGridMonth,timeGridWeek,timeGridDay' 
     },
+    height: 850,
     buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' },
     initialView: 'dayGridMonth',
     firstDay: 1,
