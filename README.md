@@ -40,20 +40,22 @@ El proyecto está diseñado para ser **ligero, auto-hospedable y de código abie
 ### Lenguajes y Frameworks
 
 - **Backend:** Python 3 + Flask  
-- **Frontend:** HTML5, CSS3, JavaScript (ligero), Jinja2  
+- **Frontend:** HTML5, CSS3, JavaScript , Jinja2  
 - **Base de Datos:** MariaDB / MySQL  
+- **Servidor: Apache
+- **Seguridad: SSL, Bcrypt
 
 ### Desarrollo y Despliegue
 
 - **Control de versiones:** Git + GitHub  
-- **IDE recomendado:** Visual Studio Code  
-- **Entorno de despliegue:** VM Linux (Ubuntu/Debian)  
-- **Servidor de producción:** Apache o Nginx + Gunicorn  
+- **IDE:** Visual Studio Code  
+- **Entorno de despliegue:** VM Windows (Windows 11)  
+- **Servidor de producción:** Apache
 
 ### Documentación y Diagramas
 
-- Documentación: LibreOffice / Word  
-- Diagramas: Draw.io / Lucidchart  
+- Documentación: Word
+- Diagramas: Lucidchart  
 - Manual de usuario y manual de configuración incluidos como anexos  
 
 ---

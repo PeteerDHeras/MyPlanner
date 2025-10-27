@@ -3,8 +3,12 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from functools import wraps
 from db import *
 
+# ------------------ FLASK ------------------
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_segura'
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000, debug=True) # Escuchar en todas las interfaces
+
 
 def login_required(f):
     @wraps(f)
@@ -42,15 +46,13 @@ def logout():
 # ----------------- DASHBOARD -----------------
 
 @app.route('/dashboard')
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
+# @login_required                                                        TODO: activar login_required
 def dashboard():
-    # Mostrar resumen con algunos eventos recientes
     eventos = obtener_eventos()
     tareas = []
     try:
         tareas = obtener_tareas()
     except Exception:
-        # Si la función no existe o falla, seguimos con una lista vacía
         tareas = []
 
     # pasar una lista corta de eventos y tareas al dashboard
@@ -59,7 +61,7 @@ def dashboard():
 # ----------------- CALENDARIO ----------------
 
 @app.route('/calendar')
-# @login_required DESCOMENTAR PARA AUTH TODO: activar login_required
+# @login_required                                                        TODO: activar login_required
 def calendar():
     # Página con FullCalendar; los eventos se obtienen desde /api/eventos
     return render_template('calendar.html')
@@ -69,12 +71,14 @@ def calendar():
 
 # Ver todos los eventos
 @app.route('/eventos')
+# @login_required                                                        TODO: activar login_required
 def ver_eventos():
     eventos = obtener_eventos()
     return render_template('eventos.html', eventos=eventos)
 
 # Crear nuevo evento
 @app.route('/eventos/nuevo', methods=['GET', 'POST'])
+# @login_required                                                        TODO: activar login_required
 def crear_evento_view():
     if request.method == 'POST':
         usuario_actual = session.get('usuario')
@@ -90,17 +94,15 @@ def crear_evento_view():
             fecha_fin=request.form.get('fecha_fin') or None,
             hora_fin=request.form.get('hora_fin') or None
         )
-
-        # Redirigir después de guardar
         return redirect(url_for('dashboard'))
 
-    # Capturar fecha preseleccionada si viene desde FullCalendar
+    # Capturar fecha preseleccionada si viene desde FullCalendar        TODO: mejorar manejo de fechas
     fecha_preseleccionada = request.args.get('fecha', '')
     return render_template('nuevo_evento.html', fecha_preseleccionada=fecha_preseleccionada)
 
-
 # Editar evento
 @app.route('/eventos/<int:id>/editar', methods=['GET', 'POST'])
+# @login_required                                                        TODO: activar login_required
 def editar_evento_view(id):
     evento = next((e for e in obtener_eventos() if e['ID'] == id), None)
     if request.method == 'POST':
@@ -124,37 +126,15 @@ def editar_evento_view(id):
 
 # Eliminar evento
 @app.route('/eventos/<int:id>/eliminar', methods=['POST'])
+# @login_required                                                        TODO: activar login_required
 def eliminar_evento_view(id):
     eliminar_evento(id)
     return redirect(url_for('ver_eventos'))
 
-
-
-# MAPEO EN INGLES
-@app.route('/events')
-def events():
-    # Use existing Spanish view
-    return redirect(url_for('ver_eventos'))
-
-
-@app.route('/events/new', methods=['GET', 'POST'])
-def new_event():
-    return crear_evento_view()
-
-
-@app.route('/events/<int:id>/edit', methods=['GET', 'POST'])
-def edit_event(id):
-    return editar_evento_view(id)
-
-
-@app.route('/events/<int:id>/delete', methods=['POST'])
-def delete_event(id):
-    return eliminar_evento_view(id)
-
-
-# ------------------ API JSON ------------------
+# ------------------ API JSON EVENTOS ------------------
 
 @app.route('/api/eventos')
+# @login_required                                                        TODO: activar login_required
 def api_eventos():
     eventos = obtener_eventos()
     eventos_json = []
@@ -179,6 +159,7 @@ def api_eventos():
     return jsonify(eventos_json)
 
 @app.route('/api/eventos/<int:evento_id>', methods=['PUT'])
+# @login_required                                                        TODO: activar login_required
 def actualizar_evento_api(evento_id):
     data = request.get_json()
     if not data.get("fecha_evento"):
@@ -202,9 +183,26 @@ def actualizar_evento_api(evento_id):
 
 
 
+# MAPEO EN INGLES                                                   TODO: Mirar si vale la pena mantener estas rutas en inglés
+@app.route('/events')
+def events():
+    # Use existing Spanish view
+    return redirect(url_for('ver_eventos'))
 
 
+@app.route('/events/new', methods=['GET', 'POST'])
+def new_event():
+    return crear_evento_view()
 
+
+@app.route('/events/<int:id>/edit', methods=['GET', 'POST'])
+def edit_event(id):
+    return editar_evento_view(id)
+
+
+@app.route('/events/<int:id>/delete', methods=['POST'])
+def delete_event(id):
+    return eliminar_evento_view(id)
 
 
 
@@ -251,7 +249,3 @@ def editar_subtarea_view(id):
 def eliminar_subtarea_view(id):
     return redirect(url_for('dashboard'))
 
-# ------------------ INICIO ------------------
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)

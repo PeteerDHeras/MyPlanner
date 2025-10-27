@@ -6,13 +6,13 @@ import bcrypt
 
 def get_connection():
     return mysql.connector.connect(
-        host="192.168.0.120",
-        user="pdelasheras",
+        host="192.168.0.120",                   # TODO: Cambiar de localhost a "myplanner.com" para simulación producción
+        user="pdelasheras",                     # TODO: Hacer que esta información viaje en ssl (Apache)
         password="pdelasheras",
         database="myplanner_db"
     )
 
-# FUNCIONES PARA GESTIONAR USUARIOS ------------------------------
+# ----------- FUNCIONES PARA GESTIONAR USUARIOS -------------------
 
 # REGISTRAR USUARIO
 def registrar_usuario(nombre, contraseña, rol_id):
@@ -39,12 +39,76 @@ def verificar_usuario(nombre, contraseña):
 def obtener_usuario_por_nombre(nombre):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT ID FROM USUARIO WHERE usuario = %s", (nombre,))      # TODO: Mejorar y obtener el usuario entero
+    cursor.execute("SELECT ID FROM USUARIO WHERE usuario = %s", (nombre,))
     usuario = cursor.fetchone()
     conn.close()
     return usuario
 
-# FUNCIONES PARA GESTIONAR TAREAS ------------------------------
+#--------------------- FUNCIONES PARA GESTIONAR EVENTOS ------------------------------
+
+# CREAR EVENTO
+def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, hora_fin=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO EVENTOS (Nombre, Fecha_creacion, Fecha_evento, Hora_evento, creadorEvento, Fecha_fin, Hora_fin)
+        VALUES (%s, CURDATE(), %s, %s, %s, %s, %s)
+    """
+    cursor.execute(query, (nombre, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
+    conn.commit()
+    conn.close()
+
+# MODIFICAR EVENTO
+def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=None, hora_fin=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        UPDATE EVENTOS
+        SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s, Fecha_fin=%s, Hora_fin=%s
+        WHERE ID=%s
+    """
+    cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, evento_id))
+    conn.commit()
+    conn.close()
+
+
+# ELIMINAR EVENTO
+def eliminar_evento(evento_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
+    conn.commit()
+    conn.close()
+
+# OBTENER EVENTOS
+def obtener_eventos():  
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM EVENTOS ORDER BY Fecha_evento ASC, Hora_evento ASC")
+    eventos = cursor.fetchall()
+    conn.close()
+    return eventos
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ----------- FUNCIONES PARA GESTIONAR TAREAS ------------------------ TODO: IMPLEMENTAR EN APP.PY
 
 # CREAR TAREA
 def crear_tarea(nombre, descripcion, fecha_limite, prioridad, creador_id):
@@ -88,55 +152,8 @@ def obtener_tareas():
     conn.close()
     return tareas
 
-# FUNCIONES PARA GESTIONAR EVENTOS ------------------------------
 
-# CREAR EVENTO (con fecha/hora opcional de fin)
-def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, hora_fin=None):
-    conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        INSERT INTO EVENTOS (Nombre, Fecha_creacion, Fecha_evento, Hora_evento, creadorEvento, Fecha_fin, Hora_fin)
-        VALUES (%s, CURDATE(), %s, %s, %s, %s, %s)
-    """
-    cursor.execute(query, (nombre, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
-    conn.commit()
-    conn.close()
-
-# MODIFICAR EVENTO (con fecha/hora opcional de fin)
-def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=None, hora_fin=None):
-    conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        UPDATE EVENTOS
-        SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s, Fecha_fin=%s, Hora_fin=%s
-        WHERE ID=%s
-    """
-    cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, evento_id))
-    conn.commit()
-    conn.close()
-
-
-# ELIMINAR EVENTO
-def eliminar_evento(evento_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
-    conn.commit()
-    conn.close()
-
-# OBTENER EVENTOS
-def obtener_eventos():  
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM EVENTOS ORDER BY Fecha_evento ASC, Hora_evento ASC")
-    eventos = cursor.fetchall()
-    conn.close()
-    return eventos
-
-    
-# FUNCIONES PARA GESTIONAR SUBATREAS ------------------------------
-
-# FUNCIONES PARA GESTIONAR SUBTAREAS ------------------------------
+# FUNCIONES PARA GESTIONAR SUBTAREAS ------------------------------ TODO: IMPLEMENTAR EN APP.PY (SI ES NECESARIO)
 
 # CREAR SUBTAREA
 def crear_subtarea(nombre, descripcion, fecha_limite, tarea_padre_id, creador_id):
