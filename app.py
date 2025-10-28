@@ -6,8 +6,6 @@ from db import *
 # ------------------ FLASK ------------------
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_segura'
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True) # Escuchar en todas las interfaces
 
 
 def login_required(f):
@@ -163,13 +161,23 @@ def api_eventos():
 def actualizar_evento_api(evento_id):
     data = request.get_json()
     if not data.get("fecha_evento"):
-        return jsonify({"error": "Faltan datos"}), 400
+        return jsonify({"error": "Falta fecha_evento"}), 400
 
     nombre = data.get("nombre", "")
     fecha_inicio = data["fecha_evento"]
     hora_inicio = data.get("hora_evento", "00:00:00")
     fecha_fin = data.get("fecha_fin") or None
     hora_fin = data.get("hora_fin") or hora_inicio
+
+    # Validación simple
+    if fecha_fin:
+        try:
+            fi = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+            ff = datetime.strptime(fecha_fin, "%Y-%m-%d")
+            if ff < fi:
+                return jsonify({"error": "fecha_fin anterior a fecha_evento"}), 400
+        except ValueError:
+            return jsonify({"error": "Formato de fecha inválido"}), 400
 
     modificar_evento(
         evento_id,
@@ -208,25 +216,72 @@ def delete_event(id):
 
 
 
-# ------------------ TAREAS (Archivadas) ------------------
-# Las rutas de tareas/subtareas se han simplificado/archivado temporalmente.
-# Si se accede a alguna de estas rutas serán redirigidas al dashboard.
+# ------------------ TAREAS ------------------
+
 
 @app.route('/tareas')
+# @login_required
 def ver_tareas():
-    return redirect(url_for('dashboard'))
+    tareas = obtener_tareas()
+    return render_template('tareas.html', tareas=tareas)
 
 @app.route('/tareas/nueva', methods=['GET', 'POST'])
+# @login_required
 def crear_tarea_view():
-    return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        usuario_actual = session.get('usuario')
+        user = obtener_usuario_por_nombre(usuario_actual)
+        creador_id = user['ID'] if user else 1
+
+        crear_tarea(
+            nombre=request.form['nombre'],
+            descripcion=request.form.get('descripcion', ''),
+            fecha_limite=request.form['fecha_limite'],
+            prioridad=request.form['prioridad'],
+            creador_id=creador_id,
+            estado=0  # Por defecto
+        )
+        return redirect(url_for('ver_tareas'))
+    
+    return render_template('nueva_tarea.html')
 
 @app.route('/tareas/<int:id>/editar', methods=['GET', 'POST'])
+# @login_required
 def editar_tarea_view(id):
-    return redirect(url_for('dashboard'))
+    tareas = obtener_tareas()
+    tarea = next((t for t in tareas if t['ID'] == id), None)
+    
+    if request.method == 'POST':
+        estado = 1 if request.form.get('estado') == 'Completada' else 0
+        modificar_tarea(
+            tarea_id=id,
+            nombre=request.form['nombre'],
+            descripcion=request.form.get('descripcion', ''),
+            fecha_limite=request.form['fecha_limite'],
+            prioridad=request.form['prioridad'],
+            estado=estado
+        )
+        return redirect(url_for('ver_tareas'))
+    
+    return render_template('editar_tarea.html', tarea=tarea)
 
 @app.route('/tareas/<int:id>/eliminar', methods=['POST'])
+# @login_required
 def eliminar_tarea_view(id):
-    return redirect(url_for('dashboard'))
+    eliminar_tarea(id)
+    return redirect(url_for('ver_tareas'))
+
+# API para cambiar estado con checkbox
+@app.route('/tareas/<int:id>/estado', methods=['POST'])
+def actualizar_estado_tarea_view(id):
+    data = request.get_json()
+    estado = int(data.get('estado', 0))  # Espera 0 o 1
+    
+    try:
+        actualizar_estado_tarea(id, estado)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 
@@ -249,3 +304,5 @@ def editar_subtarea_view(id):
 def eliminar_subtarea_view(id):
     return redirect(url_for('dashboard'))
 
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000, debug=True) # Escuchar en todas las interfaces

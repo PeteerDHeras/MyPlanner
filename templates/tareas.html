@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Tareas{% endblock %}
+{% block content %}
+<div class="container-sm mt-4">
+  <h2 class="mb-3">Tareas</h2>
+
+  <a class="btn btn-success mb-3" href="{{ url_for('crear_tarea_view') }}">Crear nueva tarea</a>
+
+  <div class="row">
+    <div class="col-12">
+      {% for tarea in tareas %}
+        <div class="card tarea-card shadow-sm border-0 bg-body-secondary mb-0 mx-auto" style="max-width: 800px;">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+
+            <!-- Casilla de check -->
+            <div class="form-check me-2">
+              <input class="form-check-input tarea-checkbox" type="checkbox" 
+                     id="tarea-{{ tarea.ID }}"
+                     data-tarea-id="{{ tarea.ID }}"
+                     {% if tarea.Estado == 1 %}checked{% endif %}>
+            </div>
+
+            <!-- Nombre + Descripción en línea -->
+            <div class="flex-grow-1 me-3">
+              <div class="d-flex align-items-center gap-3 flex-wrap">
+                <h6 class="card-title mb-0 fw-semibold text-dark small 
+                    {% if tarea.Estado == 1 %}text-decoration-line-through text-muted{% endif %}">
+                  {{ tarea.Nombre }}
+                </h6>
+                {% if tarea.Descripcion %}
+                <p class="card-text mb-0 text-secondary small 
+                    {% if tarea.Estado == 1 %}text-decoration-line-through{% endif %}">
+                  {{ tarea.Descripcion }}
+                </p>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Grupo: Prioridad, Fecha, Estado + Botones -->
+            <div class="d-flex align-items-center gap-3 flex-shrink-0">
+
+              <!-- Prioridad -->
+              <span class="badge 
+                  {% if tarea.Prioridad == 1 %}bg-info text-dark
+                  {% elif tarea.Prioridad == 2 %}bg-warning text-dark
+                  {% elif tarea.Prioridad == 3 %}bg-orange text-dark
+                  {% endif %}">
+                {% if tarea.Prioridad == 1 %}Baja{% elif tarea.Prioridad == 2 %}Media{% else %}Alta{% endif %}
+              </span>
+
+              <!-- Fecha límite -->
+              <span class="text-secondary small">{{ tarea.Fecha_limite }}</span>
+
+              <!-- Estado -->
+              <span class="badge estado-badge px-3 py-1 fw-semibold 
+                  {% if tarea.Estado == 1 %}bg-success{% else %}bg-secondary{% endif %}">
+                {{ tarea.Estado_str }}
+              </span>
+
+              <!-- Botones -->
+              <a class="btn btn-outline-light btn-sm text-dark border-dark"
+                 href="{{ url_for('editar_tarea_view', id=tarea.ID) }}">Ver tarea</a>
+              <form method="POST" action="{{ url_for('eliminar_tarea_view', id=tarea.ID) }}" class="m-0">
+                <button class="btn btn-danger btn-sm" type="submit"
+                        onclick="return confirm('¿Estás seguro de eliminar esta tarea?')">
+                  Eliminar
+                </button>
+              </form>
+
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
