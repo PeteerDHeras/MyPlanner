@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Nueva tarea{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-center p-5">
+  <div class="card p-4 shadow-sm" style="max-width: 500px; width: 100%;">
+    <h2 class="mb-4 text-center">Crear nueva tarea</h2>
+
+    <form method="POST" class="needs-validation mt-4" novalidate>
+      <!-- Nombre de la tarea -->
+      <div class="mb-3">
+        <label for="nombre" class="form-label">Nombre de la tarea</label>
+        <input type="text" id="nombre" name="nombre" class="form-control form-control-sm" required>
+        <div class="invalid-feedback">
+          Por favor ingresa el nombre de la tarea.
+        </div>
+      </div>
+
+      <!-- Descripción -->
+      <div class="mb-3 mt-4">
+        <label for="descripcion" class="form-label">Descripción</label>
+        <textarea id="descripcion" name="descripcion" class="form-control form-control-sm" rows="3"></textarea>
+      </div>
+
+      <!-- Fecha límite -->
+      <div class="mb-3 mt-4">
+        <label for="fecha_limite" class="form-label">Fecha límite</label>
+        <input type="date" id="fecha_limite" name="fecha_limite" class="form-control form-control-sm" required>
+        <div class="invalid-feedback">
+          Por favor selecciona la fecha límite.
+        </div>
+      </div>
+
+      <!-- Prioridad -->
+      <div class="mb-3 mt-4">
+        <label for="prioridad" class="form-label">Prioridad</label>
+        <select id="prioridad" name="prioridad" class="form-select form-select-sm" required>
+          <option value="1">Baja</option>
+          <option value="2" selected>Media</option>
+          <option value="3">Alta</option>
+        </select>
+        <div class="invalid-feedback">
+          Por favor selecciona la prioridad.
+        </div>
+      </div>
+
+      <!-- Estado (por defecto Pendiente) -->
+      <input type="hidden" name="estado" value="Pendiente">
+
+      <button type="submit" class="btn btn-primary w-100 mt-4">Crear tarea</button>
+    </form>
+  </div>
+</div>
+
+<script>
+// Validación de Bootstrap 5
+(() => {
+  'use strict'
+  const forms = document.querySelectorAll('.needs-validation')
+  Array.from(forms).forEach(form => {
+    form.addEventListener('submit', event => {
+      if (!form.checkValidity()) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+      form.classList.add('was-validated')
+    }, false)
+  })
+})()
+</script>
+
+{% endblock %}

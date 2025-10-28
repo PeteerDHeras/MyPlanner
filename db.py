@@ -143,6 +143,14 @@ def eliminar_tarea(tarea_id):
     conn.commit()
     conn.close()
 
+def actualizar_estado_tarea(tarea_id, estado):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = "UPDATE TAREAS SET Estado=%s WHERE ID=%s"
+    cursor.execute(query, (estado, tarea_id))
+    conn.commit()
+    conn.close()
+
 # OBTENER TAREAS
 def obtener_tareas():
     conn = get_connection()
