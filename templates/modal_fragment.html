@@ -1,0 +1,73 @@
+<!-- Minimal, bootstrap-friendly modal fragment for events and tasks -->
+<div id="item-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1050;display:flex;align-items:center;justify-content:center;">
+  <div id="item-modal" style="background:#fff;border-radius:8px;width:100%;max-width:680px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h5 style="margin:0;font-weight:600;color:#212529;">{% if tipo == 'evento' %}Ver evento{% else %}Ver tarea{% endif %}</h5>
+      <button id="modal-close" type="button" class="btn-close" aria-label="Close" style="border:none;background:transparent;font-size:18px;">✕</button>
+    </div>
+
+    <form id="modal-form">
+      <input type="hidden" name="id" value="{{ item.ID }}" />
+
+      <div class="mb-3">
+        <label class="form-label" style="color:#0b0b0b;font-weight:600;">Nombre</label>
+        <input name="nombre" type="text" value="{{ item.Nombre }}" class="form-control" readonly />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" style="color:#0b0b0b;font-weight:600;">Descripción</label>
+        <textarea name="descripcion" class="form-control" rows="3" readonly>{{ item.Descripcion or '' }}</textarea>
+      </div>
+
+      <!-- Fecha/Hora (events) or Fecha límite (tasks mapped to Fecha_evento) -->
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;">
+          <label class="form-label" style="color:#0b0b0b;font-weight:600;">Fecha</label>
+          <input name="fecha_evento" type="date" value="{{ item.Fecha_evento or '' }}" class="form-control" readonly />
+        </div>
+        <div style="width:140px;">
+          <label class="form-label" style="color:#0b0b0b;font-weight:600;">Hora</label>
+          <input name="hora_evento" type="time" value="{{ item.Hora_evento or '' }}" class="form-control" readonly />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <div style="flex:1;">
+          <label class="form-label" style="color:#0b0b0b;font-weight:600;">Fecha fin (opcional)</label>
+          <input name="fecha_fin" type="date" value="{{ item.Fecha_fin or '' }}" class="form-control" readonly />
+        </div>
+        <div style="width:140px;">
+          <label class="form-label" style="color:#0b0b0b;font-weight:600;">Hora fin (opcional)</label>
+          <input name="hora_fin" type="time" value="{{ item.Hora_fin or '' }}" class="form-control" readonly />
+        </div>
+      </div>
+
+      {% if tipo == 'tarea' %}
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:end;">
+        <div style="flex:1;">
+          <label class="form-label">Prioridad</label>
+          <select name="prioridad" class="form-select" disabled>
+            <option value="1" {% if item.Prioridad==1 %}selected{% endif %}>Baja</option>
+            <option value="2" {% if item.Prioridad==2 %}selected{% endif %}>Media</option>
+            <option value="3" {% if item.Prioridad==3 %}selected{% endif %}>Alta</option>
+          </select>
+        </div>
+        <div style="width:160px;">
+          <label class="form-label">Estado</label>
+          <select name="estado" class="form-select" disabled>
+            <option value="0" {% if item.get('Estado',0)==0 %}selected{% endif %}>Pendiente</option>
+            <option value="1" {% if item.get('Estado',0)==1 %}selected{% endif %}>Completada</option>
+          </select>
+        </div>
+      </div>
+      {% endif %}
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+        <button type="button" id="modal-edit" class="btn btn-secondary btn-sm">Editar</button>
+        <button type="button" id="modal-save" class="btn btn-primary btn-sm" style="display:none;">Guardar</button>
+        <button type="button" id="modal-cancel" class="btn btn-light btn-sm" style="display:none;">Cancelar</button>
+        <button type="button" id="modal-delete" class="btn btn-danger btn-sm">Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>

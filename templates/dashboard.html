@@ -49,7 +49,7 @@
 			<!-- Semana de un vistazo -->
 			<div class="bg-card-light p-6 rounded-xl shadow-sm flex flex-col items-start gap-4">
 				<h2 class="text-gray-900 text-xl font-bold leading-tight tracking-tight">
-					Tu Semana de un Vistazo
+					Resumen semanal
 				</h2>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
@@ -104,10 +104,9 @@
 							</div>
 
 							<div class="shrink-0">
-								<a href="{{ url_for('ver_eventos') }}" 
-									class="text-primary text-sm font-medium leading-normal hover:underline">
+								<button data-id="{{ evento.ID }}" data-type="evento" class="link-view-event text-primary text-sm font-medium leading-normal hover:underline bg-transparent border-0 p-0">
 									Ver Detalles
-								</a>
+								</button>
 							</div>
 						</div>
 						{% endfor %}

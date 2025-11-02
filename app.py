@@ -117,7 +117,7 @@ def crear_evento_view():
         )
         return redirect(url_for('dashboard'))
 
-    # Capturar fecha preseleccionada si viene desde FullCalendar        TODO: mejorar manejo de fechas
+    # Capturar fecha preseleccionada si viene desde FullCalendar        
     fecha_preseleccionada = request.args.get('fecha', '')
     return render_template('nuevo_evento.html', fecha_preseleccionada=fecha_preseleccionada)
 
@@ -125,25 +125,77 @@ def crear_evento_view():
 @app.route('/eventos/<int:id>/editar', methods=['GET', 'POST'])
 # @login_required                                                        TODO: activar login_required
 def editar_evento_view(id):
+    # Full-page event editor removed; redirect to events list.
+    return redirect(url_for('ver_eventos'))
+
+
+# Ver evento (modal fragment)
+@app.route('/eventos/<int:id>/ver')
+def ver_evento_view(id):
     evento = next((e for e in obtener_eventos() if e['ID'] == id), None)
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        fecha_inicio = request.form['fecha_evento']
-        hora_inicio = request.form['hora_evento']
-        fecha_fin = request.form.get('fecha_fin') or None
-        hora_fin = request.form.get('hora_fin') or hora_inicio
+    if not evento:
+        return ("Evento no encontrado", 404)
+    # Normalize fields for template (ensure times/dates are strings)
+    def time_to_str(val):
+        if not val:
+            return ''
+        # string like 'HH:MM:SS' or 'HH:MM'
+        if isinstance(val, str):
+            return val[:5]
+        # datetime.time
+        try:
+            if isinstance(val, time):
+                return val.strftime('%H:%M')
+        except Exception:
+            pass
+        # timedelta -> convert to HH:MM
+        try:
+            if hasattr(val, 'total_seconds'):
+                total = int(val.total_seconds())
+                hours = (total // 3600) % 24
+                minutes = (total % 3600) // 60
+                return f"{hours:02d}:{minutes:02d}"
+        except Exception:
+            pass
+        return str(val)[:5]
 
-        modificar_evento(
-            id,
-            nombre,
-            fecha_inicio,
-            hora_inicio,
-            fecha_fin,
-            hora_fin
-        )
-        return redirect(url_for('dashboard'))
+    evento_display = dict(evento)  # shallow copy
+    evento_display['Hora_evento'] = time_to_str(evento.get('Hora_evento'))
+    evento_display['Hora_fin'] = time_to_str(evento.get('Hora_fin'))
+    # Ensure date strings
+    if evento_display.get('Fecha_evento') is not None:
+        evento_display['Fecha_evento'] = str(evento_display['Fecha_evento'])
+    if evento_display.get('Fecha_fin') is not None:
+        evento_display['Fecha_fin'] = str(evento_display['Fecha_fin'])
 
-    return render_template('editar_evento.html', evento=evento)
+    # Render generic modal fragment for items
+    return render_template('modal_fragment.html', item=evento_display, tipo='evento')
+
+
+# Ver tarea (modal fragment)
+@app.route('/tareas/<int:id>/ver')
+def ver_tarea_view(id):
+    tarea = next((t for t in obtener_tareas() if t['ID'] == id), None)
+    if not tarea:
+        return ("Tarea no encontrada", 404)
+    tarea_display = dict(tarea)
+    # normalize date
+    if tarea_display.get('Fecha_limite') is not None:
+        tarea_display['Fecha_evento'] = str(tarea_display.get('Fecha_limite'))
+    else:
+        tarea_display['Fecha_evento'] = ''
+    # map common fields expected by modal_fragment
+    tarea_display.setdefault('Nombre', tarea_display.get('Nombre', ''))
+    tarea_display.setdefault('Descripcion', tarea_display.get('Descripcion', ''))
+    tarea_display.setdefault('Hora_evento', '')
+    tarea_display.setdefault('Fecha_fin', '')
+    tarea_display.setdefault('Hora_fin', '')
+
+    # Ensure prioridad and estado keys exist for template
+    tarea_display.setdefault('Prioridad', tarea_display.get('Prioridad', 1))
+    tarea_display.setdefault('Estado', tarea_display.get('Estado', 0))
+
+    return render_template('ver_tarea.html', tarea=tarea_display)
 
 # Eliminar evento
 @app.route('/eventos/<int:id>/eliminar', methods=['POST'])
@@ -212,7 +264,82 @@ def actualizar_evento_api(evento_id):
         fecha_fin,
         hora_fin
     )
-    return jsonify({"message": "Evento actualizado correctamente"}), 200
+    # retrieve updated event and normalize fields for JSON response
+    eventos = obtener_eventos()
+    evento = next((e for e in eventos if e['ID'] == evento_id), None)
+    if not evento:
+        return jsonify({'error': 'Evento actualizado pero no encontrado'}), 500
+
+    def norm_time(val):
+        if not val:
+            return ''
+        if isinstance(val, str):
+            return val[:5]
+        try:
+            if isinstance(val, time):
+                return val.strftime('%H:%M')
+        except Exception:
+            pass
+        try:
+            if hasattr(val, 'total_seconds'):
+                total = int(val.total_seconds())
+                hours = (total // 3600) % 24
+                minutes = (total % 3600) // 60
+                return f"{hours:02d}:{minutes:02d}"
+        except Exception:
+            pass
+        return str(val)[:5]
+
+    evento_display = dict(evento)
+    evento_display['Hora_evento'] = norm_time(evento.get('Hora_evento'))
+    evento_display['Hora_fin'] = norm_time(evento.get('Hora_fin'))
+    if evento_display.get('Fecha_evento') is not None:
+        evento_display['Fecha_evento'] = str(evento_display['Fecha_evento'])
+    if evento_display.get('Fecha_fin') is not None:
+        evento_display['Fecha_fin'] = str(evento_display['Fecha_fin'])
+
+    return jsonify(evento_display), 200
+
+
+@app.route('/api/tareas/<int:tarea_id>', methods=['PUT'])
+def actualizar_tarea_api(tarea_id):
+    data = request.get_json() or {}
+    # Map payload to task fields
+    nombre = data.get('nombre', '')
+    descripcion = data.get('descripcion', '')
+    fecha_limite = data.get('fecha_evento') or data.get('fecha_limite') or None
+    prioridad = int(data.get('prioridad', 1)) if data.get('prioridad') is not None else 1
+    # estado: accept 0/1 or 'Pendiente'/'Completada'
+    estado_raw = data.get('estado')
+    if estado_raw is None:
+        estado = 0
+    else:
+        try:
+            estado = int(estado_raw)
+        except Exception:
+            estado = 1 if str(estado_raw).lower().startswith('c') else 0
+
+    try:
+        modificar_tarea(tarea_id, nombre, descripcion, fecha_limite, prioridad, estado)
+        # fetch updated tarea
+        tareas = obtener_tareas()
+        tarea = next((t for t in tareas if t['ID'] == tarea_id), None)
+        if not tarea:
+            return jsonify({'error': 'Tarea actualizada pero no encontrada'}), 500
+
+        tarea_display = dict(tarea)
+        # normalize date field name to help client
+        if tarea_display.get('Fecha_limite') is not None:
+            tarea_display['Fecha_limite'] = str(tarea_display['Fecha_limite'])
+        # keep keys consistent
+        tarea_display.setdefault('Nombre', tarea_display.get('Nombre', ''))
+        tarea_display.setdefault('Descripcion', tarea_display.get('Descripcion', ''))
+        tarea_display.setdefault('Prioridad', tarea_display.get('Prioridad', 1))
+        tarea_display.setdefault('Estado', tarea_display.get('Estado', 0))
+
+        return jsonify(tarea_display), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 
@@ -230,7 +357,9 @@ def new_event():
 
 @app.route('/events/<int:id>/edit', methods=['GET', 'POST'])
 def edit_event(id):
-    return editar_evento_view(id)
+    # Full-page edit flow was removed in favor of modal editor.
+    # Redirect to events listing (UI should open modal instead).
+    return redirect(url_for('ver_eventos'))
 
 
 @app.route('/events/<int:id>/delete', methods=['POST'])
@@ -273,22 +402,9 @@ def crear_tarea_view():
 @app.route('/tareas/<int:id>/editar', methods=['GET', 'POST'])
 # @login_required
 def editar_tarea_view(id):
-    tareas = obtener_tareas()
-    tarea = next((t for t in tareas if t['ID'] == id), None)
-    
-    if request.method == 'POST':
-        estado = 1 if request.form.get('estado') == 'Completada' else 0
-        modificar_tarea(
-            tarea_id=id,
-            nombre=request.form['nombre'],
-            descripcion=request.form.get('descripcion', ''),
-            fecha_limite=request.form['fecha_limite'],
-            prioridad=request.form['prioridad'],
-            estado=estado
-        )
-        return redirect(url_for('ver_tareas'))
-    
-    return render_template('editar_tarea.html', tarea=tarea)
+    # Full-page task editor removed in favor of modal.
+    # For backward compatibility redirect to tasks listing.
+    return redirect(url_for('ver_tareas'))
 
 @app.route('/tareas/<int:id>/eliminar', methods=['POST'])
 # @login_required
@@ -307,27 +423,6 @@ def actualizar_estado_tarea_view(id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-
-# ------------------ SUBTAREAS (Archivadas) ------------------
-# Rutas de subtareas deshabilitadas temporalmente; redirigen al dashboard.
-
-@app.route('/subtareas')
-def ver_subtareas():
-    return redirect(url_for('dashboard'))
-
-@app.route('/subtareas/nueva', methods=['GET', 'POST'])
-def crear_subtarea_view():
-    return redirect(url_for('dashboard'))
-
-@app.route('/subtareas/<int:id>/editar', methods=['GET', 'POST'])
-def editar_subtarea_view(id):
-    return redirect(url_for('dashboard'))
-
-@app.route('/subtareas/<int:id>/eliminar', methods=['POST'])
-def eliminar_subtarea_view(id):
-    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True) # Escuchar en todas las interfaces

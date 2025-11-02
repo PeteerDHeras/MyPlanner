@@ -58,9 +58,9 @@
                 {{ tarea.Estado_str }}
               </span>
 
-              <!-- Botones -->
-              <a class="btn btn-outline-light btn-sm text-dark border-dark"
-                 href="{{ url_for('editar_tarea_view', id=tarea.ID) }}">Ver tarea</a>
+          <!-- Botones -->
+          <button data-id="{{ tarea.ID }}" data-type="tarea" class="btn btn-outline-light btn-sm text-dark border-dark btn-view-task">Ver tarea</button>
+          <button class="btn btn-outline-light btn-sm text-dark border-dark ms-1 btn-view-task" data-id="{{ tarea.ID }}" data-type="tarea" data-action="edit">Editar</button>
               <form method="POST" action="{{ url_for('eliminar_tarea_view', id=tarea.ID) }}" class="m-0">
                 <button class="btn btn-danger btn-sm" type="submit"
                         onclick="return confirm('¿Estás seguro de eliminar esta tarea?')">

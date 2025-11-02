@@ -76,7 +76,8 @@ def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=Non
 # ELIMINAR EVENTO
 def eliminar_evento(evento_id):
     conn = get_connection()
-    cursor = conn.cursor()
+    # Conexión a la base de datos
+
     cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
     conn.commit()
     conn.close()
