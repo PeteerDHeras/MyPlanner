@@ -160,7 +160,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                   if (!data.success) throw new Error(data.error || 'Error desconocido');
 
-                  // 🔹 Modo 1: card grande
+                  // Actualizar el estilo del texto de la tarea
+                  const tareaTexto = this.nextElementSibling;
+                  if (tareaTexto) {
+                      if (completada) {
+                          tareaTexto.classList.add('text-gray-500', 'line-through');
+                          tareaTexto.classList.remove('text-gray-800');
+                      } else {
+                          tareaTexto.classList.remove('text-gray-500', 'line-through');
+                          tareaTexto.classList.add('text-gray-800');
+                      }
+                  }
+
+                  // 🔹 Modo 1: card grande (para vista de tareas)
                   const card = this.closest('.card');
                   if (card) {
                     const estadoBadge = card.querySelector('.estado-badge');
