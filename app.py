@@ -152,7 +152,8 @@ def crear_evento_view():
             hora_evento=request.form['hora_evento'],
             creador_id=creador_id,
             fecha_fin=request.form.get('fecha_fin') or None,
-            hora_fin=request.form.get('hora_fin') or None
+            hora_fin=request.form.get('hora_fin') or None,
+            descripcion=request.form.get('descripcion') or None
         )
         return redirect(url_for('dashboard'))
 
@@ -349,10 +350,22 @@ def actualizar_evento_api(evento_id):
         return jsonify({"error": "Falta fecha_evento"}), 400
 
     nombre = data.get("nombre", "")
+    descripcion = data.get("descripcion", "")
     fecha_inicio = data["fecha_evento"]
     hora_inicio = data.get("hora_evento", "00:00:00")
-    fecha_fin = data.get("fecha_fin") or None
-    hora_fin = data.get("hora_fin") or hora_inicio
+    
+    # Manejar fecha_fin y hora_fin (pueden ser vacíos o None)
+    fecha_fin = data.get("fecha_fin")
+    if fecha_fin == '' or fecha_fin == 'null':
+        fecha_fin = None
+    
+    hora_fin = data.get("hora_fin")
+    if hora_fin == '' or hora_fin == 'null':
+        hora_fin = None
+    
+    # Si hay fecha_fin pero no hora_fin, usar hora de inicio
+    if fecha_fin and not hora_fin:
+        hora_fin = hora_inicio
 
     # Validación simple
     if fecha_fin:
@@ -370,7 +383,8 @@ def actualizar_evento_api(evento_id):
         fecha_inicio,
         hora_inicio,
         fecha_fin,
-        hora_fin
+        hora_fin,
+        descripcion
     )
     eventos = obtener_eventos()
     evento = next((e for e in eventos if e['ID'] == evento_id), None)

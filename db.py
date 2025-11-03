@@ -10,7 +10,9 @@ def get_connection():
         host="localhost",                   # 192.168.0.120 o localhost (portatil)
         user="pdelasheras",                     
         password="pdelasheras",
-        database="myplanner_db"
+        database="myplanner_db",
+        autocommit=False,  # Desactivar autocommit para manejar transacciones manualmente
+        connection_timeout=10  # Timeout de conexión
     )
 
 # ----------- FUNCIONES PARA GESTIONAR USUARIOS -------------------
@@ -48,38 +50,53 @@ def obtener_usuario_por_nombre(nombre):
 #--------------------- FUNCIONES PARA GESTIONAR EVENTOS ------------------------------
 
 # CREAR EVENTO
-def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, hora_fin=None):
+def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, hora_fin=None, descripcion=None):
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        INSERT INTO EVENTOS (Nombre, Fecha_creacion, Fecha_evento, Hora_evento, creadorEvento, Fecha_fin, Hora_fin)
-        VALUES (%s, CURDATE(), %s, %s, %s, %s, %s)
-    """
-    cursor.execute(query, (nombre, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO EVENTOS (Nombre, Descripcion, Fecha_creacion, Fecha_evento, Hora_evento, creadorEvento, Fecha_fin, Hora_fin)
+            VALUES (%s, %s, CURDATE(), %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (nombre, descripcion, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # MODIFICAR EVENTO
-def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=None, hora_fin=None):
+def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=None, hora_fin=None, descripcion=None):
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        UPDATE EVENTOS
-        SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s, Fecha_fin=%s, Hora_fin=%s
-        WHERE ID=%s
-    """
-    cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, evento_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = """
+            UPDATE EVENTOS
+            SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s, Fecha_fin=%s, Hora_fin=%s, Descripcion=%s
+            WHERE ID=%s
+        """
+        cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, descripcion, evento_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 
 # ELIMINAR EVENTO
 def eliminar_evento(evento_id):
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # OBTENER EVENTOS
 def obtener_eventos():  
@@ -95,43 +112,63 @@ def obtener_eventos():
 # Modificar CREAR TAREA para incluir estado
 def crear_tarea(nombre, descripcion, fecha_limite, prioridad, creador_id, estado=0):
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        INSERT INTO TAREAS (Nombre, Descripcion, Fecha_creacion, Fecha_limite, Prioridad, creadorTarea, Estado)
-        VALUES (%s, %s, CURDATE(), %s, %s, %s, %s)
-    """
-    cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id, estado))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO TAREAS (Nombre, Descripcion, Fecha_creacion, Fecha_limite, Prioridad, creadorTarea, Estado)
+            VALUES (%s, %s, CURDATE(), %s, %s, %s, %s)
+        """
+        cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id, estado))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # Modificar MODIFICAR TAREA para incluir estado
 def modificar_tarea(tarea_id, nombre, descripcion, fecha_limite, prioridad, estado):
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        UPDATE TAREAS
-        SET Nombre=%s, Descripcion=%s, Fecha_limite=%s, Prioridad=%s, Estado=%s
-        WHERE ID=%s
-    """
-    cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, estado, tarea_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = """
+            UPDATE TAREAS
+            SET Nombre=%s, Descripcion=%s, Fecha_limite=%s, Prioridad=%s, Estado=%s
+            WHERE ID=%s
+        """
+        cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, estado, tarea_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # ELIMINAR TAREA
 def eliminar_tarea(tarea_id):
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM TAREAS WHERE ID=%s", (tarea_id,))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM TAREAS WHERE ID=%s", (tarea_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 def actualizar_estado_tarea(tarea_id, estado):
     conn = get_connection()
-    cursor = conn.cursor()
-    query = "UPDATE TAREAS SET Estado=%s WHERE ID=%s"
-    cursor.execute(query, (estado, tarea_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = "UPDATE TAREAS SET Estado=%s WHERE ID=%s"
+        cursor.execute(query, (estado, tarea_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # OBTENER TAREAS
 def obtener_tareas():
