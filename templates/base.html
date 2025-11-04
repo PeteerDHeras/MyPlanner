@@ -71,9 +71,10 @@
                         <!-- Iniciar/Cerrar sesión -->
                         <li class="nav-item mt-3">
                             {% if session.get('usuario') %}
-                            <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100">Cerrar sesión</a>
+                            <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100 mb-2">Cerrar sesión</a>
                             {% else %}
-                            <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100">Iniciar sesión</a>
+                            <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100 mb-2">Iniciar sesión</a>
+                            <a href="{{ url_for('register') }}" class="btn btn-success w-100">Registrarse</a>
                             {% endif %}
                         </li>
                     </ul>
@@ -103,6 +104,25 @@
 
     <!-- FullCalendar JS -->
     <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+        {# Mensajes flash -> se muestran como toast y fallback alert oculto #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="position:absolute;left:-9999px;top:-9999px;">
+                {% for category, msg in messages %}
+                    <div class="flash-msg" data-category="{{ category }}">{{ msg }}</div>
+                {% endfor %}
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function(){
+                    document.querySelectorAll('.flash-msg').forEach(function(el){
+                        var cat = el.getAttribute('data-category') || 'success';
+                        var text = el.textContent.trim();
+                        try { showToast(text, cat === 'error' ? 'error' : 'success'); } catch(e) {}
+                    });
+                });
+            </script>
+        {% endif %}
+        {% endwith %}
 </body>
 
 </html>

@@ -2,6 +2,13 @@
 {% block title %}Login{% endblock %}
 {% block content %}
 <h2 class="m-4">Iniciar sesión</h2>
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, msg in messages %}
+            <div class="alert alert-success mx-auto col-md-6" role="alert">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
 <form method="POST" class="col-md-6 mx-auto p-10"> 
     <input class="form-control mb-3" type="text" name="usuario" placeholder="Usuario" required>
     <input class="form-control mb-3" type="password" name="password" placeholder="Contraseña" required>
