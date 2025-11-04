@@ -57,12 +57,17 @@ class Evento:
         hora_inicio = self._normalizar_hora(self.hora_evento) or '00:00'
         hora_fin = self._normalizar_hora(self.hora_fin) or hora_inicio
         fecha_fin = self.fecha_fin or self.fecha_evento
-        
+        # Añadimos extendedProps para conservar descripción (y otros si se necesitan)
         return {
             "id": self.id,
             "title": self.nombre,
             "start": f"{self.fecha_evento}T{hora_inicio}",
-            "end": f"{fecha_fin}T{hora_fin}"
+            "end": f"{fecha_fin}T{hora_fin}",
+            "extendedProps": {
+                "descripcion": self.descripcion or '',
+                "fecha_evento": str(self.fecha_evento) if self.fecha_evento else '',
+                "fecha_fin": str(fecha_fin) if fecha_fin else '',
+            }
         }
     
     def es_de_fecha(self, fecha):

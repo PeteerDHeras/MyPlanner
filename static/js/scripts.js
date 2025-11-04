@@ -256,91 +256,173 @@ function removeItemFromDOM(type, id) {
 
 document.addEventListener('DOMContentLoaded', function () {
   const calendarEl = document.getElementById('calendar');
-  if (!calendarEl) return; // Si no existe el elemento calendario, salir
+  if (!calendarEl) return;
 
-  // Configuración del calendario FullCalendar
+  // ================= FULLCALENDAR RESET BÁSICO =================
+  // Configuración mínima y clara: muestra todos los eventos, permite moverlos
+  // entre días y abre el modal de detalle al hacer click.
   const calendar = new FullCalendar.Calendar(calendarEl, {
-    themeSystem: 'bootstrap5',
-    bootstrapFontAwesome: {
-      prev: 'fa-solid fa-chevron-left',
-      next: 'fa-solid fa-chevron-right',
-      today: 'fa-solid fa-calendar-day'
-    },
-    buttonIcons: false,
-    headerToolbar: { 
-      left: 'prev,next today', 
-      center: 'title', 
-      right: 'dayGridMonth,timeGridWeek,timeGridDay' 
-    },
-    height: 850,
-    buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' },
+    locale: 'es',
     initialView: 'dayGridMonth',
     firstDay: 1,
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    height: 760,
+    editable: true,          // permite drag & drop
     selectable: true,
-    selectMirror: true,
-    editable: true,              // permite drag & resize
-    eventResizableFromStart: true,
-    dragScroll: true,
-    timeZone: 'Europe/Madrid',
-    locale: 'es',
-    defaultTimedEventDuration: '00:00:10',
+    events: '/api/eventos',  // ahora devuelve TODOS los eventos
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-    events: '/api/eventos', // Cargar eventos desde el endpoint de la API
-    
-    // --- EVENTO: Click en un día vacío ---
-    // Redirige a la página de crear evento con la fecha pre-seleccionada
+
+    // Crear nuevo evento al hacer click en un día vacío -> modal rápido
     dateClick: function(info) {
-      const params = new URLSearchParams();
-      params.set('fecha_evento', info.dateStr);
-      window.location.href = `/eventos/nuevo?${params.toString()}`;
+      abrirModalCreacionRapida(info.dateStr);
     },
 
-    // --- EVENTO: Click en un evento existente ---
-    // Abre el modal de visualización del evento
-      eventClick: function(info) {
-        if (!confirm(`¿Abrir detalles del evento "${info.event.title}"?`)) return;
-        // Crear un botón temporal que el event listener delegado capturará
-        const tmp = document.createElement('button');
-        tmp.style.display = 'none';
-        tmp.className = 'btn-view-event';
-        tmp.setAttribute('data-id', info.event.id);
-        tmp.setAttribute('data-type', 'evento');
-        // Abrir en modo visualización; para modo edición por defecto, usar data-action="edit"
-        document.body.appendChild(tmp);
-        tmp.click();
-        tmp.remove();
-      },
+    // Abrir modal de evento directamente al hacer click
+    eventClick: function(info) {
+      const tmp = document.createElement('button');
+      tmp.style.display = 'none';
+      tmp.className = 'btn-view-event';
+      tmp.setAttribute('data-id', info.event.id);
+      tmp.setAttribute('data-type', 'evento');
+      document.body.appendChild(tmp);
+      tmp.click();
+      tmp.remove();
+    },
 
-    // --- EVENTO: Arrastrar evento a otro día/hora (Drag & Drop) ---
+    // Drag & drop: mover a otro día (o semana/día). Persistir sin confirmación.
     eventDrop: function(info) {
-      if (!confirm('¿Guardar nueva fecha/hora del evento?')) {
-        info.revert();
-        return;
-      }
-      actualizarEventoDesdeCalendario(info, /*esResize*/ false);
+      actualizarEventoDesdeCalendario(info, false);
     },
 
-    // --- EVENTO: Redimensionar evento para cambiar duración (Resize) ---
+    // Resize opcional (si se usan rangos de tiempo). Se mantiene para coherencia.
     eventResize: function(info) {
-      if (!confirm('¿Guardar nueva duración del evento?')) {
-        info.revert();
-        return;
-      }
-      actualizarEventoDesdeCalendario(info, /*esResize*/ true);
-    },
-
-    // --- EVENTO: Mostrar tooltip al pasar el cursor ---
-    // Muestra información básica del evento en un tooltip nativo
-    eventMouseEnter: function(info) {
-      const el = info.el;
-      const e = info.event;
-      const start = e.startStr.replace('T', ' ');
-      const end = e.end ? e.endStr.replace('T', ' ') : '';
-      el.setAttribute('title', end ? `${e.title}\nInicio: ${start}\nFin: ${end}` : `${e.title}\nInicio: ${start}`);
+      actualizarEventoDesdeCalendario(info, true);
     }
   });
 
-  calendar.render(); // Renderizar el calendario en el DOM
+  calendar.render();
+  // Exponer para otros handlers (edición) y refetch
+  window.calendar = calendar;
+
+  // ============== MODAL CREACIÓN RÁPIDA ==============
+  function abrirModalCreacionRapida(fechaStr) {
+    // Evitar abrir múltiples modales
+    if (document.getElementById('quick-event-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'quick-event-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.45)';
+    overlay.style.zIndex = '1060';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    const modal = document.createElement('div');
+    modal.style.background = '#fff';
+    modal.style.width = '100%';
+    modal.style.maxWidth = '420px';
+    modal.style.borderRadius = '10px';
+    modal.style.padding = '18px 20px 20px';
+    modal.style.boxShadow = '0 8px 28px rgba(0,0,0,0.25)';
+    modal.innerHTML = `
+      <h5 style="margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;">Nuevo evento rápido <button type="button" id="quick-close" class="btn btn-sm btn-outline-secondary">✕</button></h5>
+      <form id="quick-event-form">
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Nombre *</label>
+          <input name="nombre" type="text" class="form-control" maxlength="100" required />
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Descripción</label>
+          <textarea name="descripcion" rows="2" class="form-control" maxlength="500" placeholder="Opcional"></textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Fecha inicio *</label>
+          <input name="fecha_evento" type="date" class="form-control" value="${fechaStr}" required />
+        </div>
+        <div class="mb-2" style="display:flex;gap:8px;">
+          <div style="flex:1;">
+            <label class="form-label" style="font-weight:600;">Hora inicio</label>
+            <input name="hora_evento" type="time" class="form-control" />
+          </div>
+          <div style="flex:1;">
+            <label class="form-label" style="font-weight:600;">Hora fin</label>
+            <input name="hora_fin" type="time" class="form-control" />
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Fecha fin</label>
+          <input name="fecha_fin" type="date" class="form-control" />
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+          <button type="button" id="quick-cancel" class="btn btn-light">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Crear</button>
+        </div>
+        <div id="quick-error" class="text-danger small mt-2" style="display:none;"></div>
+      </form>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Cerrar
+    const cerrar = () => overlay.remove();
+    modal.querySelector('#quick-close').addEventListener('click', cerrar);
+    modal.querySelector('#quick-cancel').addEventListener('click', cerrar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
+
+    // Submit
+    const form = modal.querySelector('#quick-event-form');
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      const fd = new FormData(form);
+      const nombre = (fd.get('nombre') || '').trim();
+      if (!nombre) {
+        mostrarError('El nombre es obligatorio');
+        return;
+      }
+      if (nombre.length < 3) { mostrarError('Nombre mínimo 3 caracteres'); return; }
+      const fecha_evento = fd.get('fecha_evento');
+      const hora_evento = fd.get('hora_evento') || '00:00';
+      const fecha_fin = fd.get('fecha_fin') || null;
+      const hora_fin = fd.get('hora_fin') || null;
+      const descripcion = (fd.get('descripcion') || '').trim();
+
+      // Validación simple hora fin > inicio si ambas
+      if (hora_evento && hora_fin) {
+        if (hora_fin <= hora_evento) { mostrarError('Hora fin debe ser posterior'); return; }
+      }
+      // Validación simple fecha fin >= inicio
+      if (fecha_fin && fecha_fin < fecha_evento) { mostrarError('Fecha fin debe ser posterior'); return; }
+
+      const payload = { nombre, fecha_evento, hora_evento, fecha_fin: fecha_fin || null, hora_fin: hora_fin || null, descripcion };
+      fetch('/api/eventos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+      .then(res => {
+        if (!res.ok) { mostrarError(res.body.error || 'Error creando evento'); return; }
+        // Añadir evento inmediatamente (optimista) usando datos devueltos
+        try { if (window.calendar) { window.calendar.addEvent(res.body); } } catch(_) {}
+        showToast('Evento creado', 'success');
+        cerrar();
+        // Refetch para asegurar coherencia (IDs, etc.)
+        if (window.calendar) window.calendar.refetchEvents();
+      })
+      .catch(err => { console.error(err); mostrarError('Error de red creando evento'); });
+    });
+
+    function mostrarError(msg){
+      const box = modal.querySelector('#quick-error');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+  }
 
   // --- FUNCIÓN AUXILIAR: Formatear fecha/hora ---
   // Convierte un objeto Date en formato separado para fecha y hora
@@ -390,16 +472,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Construir payload para enviar al endpoint PUT /api/eventos/:id
+    // Conservar descripción original si existe en extendedProps
+    const descripcionOriginal = event.extendedProps && event.extendedProps.descripcion ? event.extendedProps.descripcion : null;
     const payload = {
       nombre: event.title,
       fecha_evento: startParts.fecha,
       hora_evento: startParts.hora,
       fecha_fin: endParts ? endParts.fecha : null,
-      hora_fin: endParts ? endParts.hora : null
+      hora_fin: endParts ? endParts.hora : null,
+      ...(descripcionOriginal ? { descripcion: descripcionOriginal } : {})
     };
 
     // Enviar actualización al servidor
-    fetch(`/api/eventos/${event.id}`, {
+  fetch(`/api/eventos/${event.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -779,6 +864,10 @@ document.addEventListener('click', function (e) {
                 console.warn('No se pudo eliminar elemento del DOM', e);
               }
               closeModal();
+              // Refrescar eventos del calendario si se editó un evento
+              if (type === 'evento' && window.calendar) {
+                try { window.calendar.refetchEvents(); } catch(e) { console.warn('Refetch falló', e); }
+              }
             })
             .catch(err => { console.error(err); alert('Error al eliminar el elemento'); });
       });

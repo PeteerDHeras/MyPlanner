@@ -10,7 +10,7 @@ Notas:
 """
 
 from datetime import datetime, time
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from functools import wraps
 from db import *  # funciones de acceso a datos: obtener_eventos, crear_tarea, etc.
 from models import Evento, Tarea
@@ -77,6 +77,50 @@ def logout():
     """Cierra la sesión del usuario."""
     session.pop('usuario', None)
     return redirect(url_for('login'))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Registro sencillo de usuario con rol por defecto 1.
+
+    Validaciones: nombre y contraseña requeridos, longitudes mínimas,
+    usuario no existente previamente. Tras registrar redirige a login.
+    """
+    if request.method == 'POST':
+        import re
+        usuario = sanitizar_texto(request.form.get('usuario', ''))
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm', '')
+
+        # Reglas contraseña: min 8, mayúscula, minúscula, dígito, símbolo !@#$%&*._-
+        patron_password = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*._-])[A-Za-z\d!@#$%&*._-]{8,}$'
+
+        # Validaciones básicas
+        if not validar_no_vacio(usuario) or not validar_no_vacio(password):
+            return render_template('register.html', error='Usuario y contraseña requeridos')
+        if not validar_longitud(usuario, 50, 3):
+            return render_template('register.html', error='Usuario 3-50 caracteres')
+        if not re.match(patron_password, password):
+            return render_template('register.html', error='Contraseña no cumple requisitos')
+        if password != confirm:
+            return render_template('register.html', error='Las contraseñas no coinciden')
+
+        # Usuario existente
+        existente = obtener_usuario_por_nombre(usuario)
+        if existente:
+            return render_template('register.html', error='El usuario ya existe')
+
+        try:
+            registrar_usuario(usuario, password, 1)
+        except ValueError as e:
+            return render_template('register.html', error=str(e))
+        except Exception:
+            return render_template('register.html', error='Error interno registrando usuario')
+
+        flash('Registro exitoso. Ahora puedes iniciar sesión', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
 
 
 # ----------------- DASHBOARD -----------------
@@ -347,19 +391,16 @@ def actualizar_estado_tarea_view(id):
 @app.route('/api/eventos')
 @login_required
 def api_eventos():
-    """Devuelve eventos en formato JSON para FullCalendar.
+    """Devuelve TODOS los eventos para FullCalendar en formato JSON.
 
-    Actualmente filtra por eventos del día (comportamiento previo).
+    Antes se filtraban únicamente los del día. Para el calendario completo
+    necesitamos todos para que FullCalendar pueda mostrarlos y permitir
+    arrastrar entre días sin que desaparezcan.
     """
     eventos_data = obtener_eventos()
-    fecha_hoy = datetime.today().date()
-    
-    # Filtrar eventos de hoy
-    eventos_hoy = filtrar_eventos_por_fecha(eventos_data, fecha_hoy)
-    
-    # Convertir a formato FullCalendar
+
     eventos_json = []
-    for e_data in eventos_hoy:
+    for e_data in eventos_data:
         evento = Evento(e_data)
         eventos_json.append(evento.to_fullcalendar())
 
@@ -449,6 +490,78 @@ def actualizar_evento_api(evento_id):
 
     evento = Evento(evento_data)
     return jsonify(evento.to_dict()), 200
+
+
+@app.route('/api/eventos', methods=['POST'])
+@login_required
+def crear_evento_api():
+    """API para crear evento rápido desde el calendario (JSON POST).
+
+    Espera en el body JSON: nombre, fecha_evento, hora_evento opcional,
+    fecha_fin/hora_fin opcionales, descripcion opcional.
+    Devuelve el evento creado en formato FullCalendar para inyección directa.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'JSON inválido'}), 400
+
+    nombre = sanitizar_texto(data.get('nombre', ''))
+    descripcion = sanitizar_texto(data.get('descripcion', '')) or None
+    fecha_evento = (data.get('fecha_evento') or '').strip()
+    hora_evento = (data.get('hora_evento') or '00:00')[:5]
+    fecha_fin = limpiar_valor_opcional(data.get('fecha_fin'))
+    hora_fin = limpiar_valor_opcional(data.get('hora_fin'))
+    if hora_fin:
+        hora_fin = hora_fin[:5]
+
+    # Validaciones básicas
+    if not validar_texto_seguro(nombre, 100, required=True):
+        return jsonify({'error': 'Nombre inválido'}), 400
+    if not validar_fecha_formato(fecha_evento):
+        return jsonify({'error': 'Fecha inválida'}), 400
+    if not validar_fecha_no_pasada(fecha_evento):
+        return jsonify({'error': 'Fecha debe ser hoy o futura'}), 400
+    if hora_evento and not validar_hora_formato(hora_evento):
+        return jsonify({'error': 'Hora inválida'}), 400
+    if fecha_fin and not validar_fecha_formato(fecha_fin):
+        return jsonify({'error': 'Fecha fin inválida'}), 400
+    if fecha_fin and not validar_fechas(fecha_evento, fecha_fin):
+        return jsonify({'error': 'Fecha fin debe ser posterior a inicio'}), 400
+    if hora_fin and not validar_hora_formato(hora_fin):
+        return jsonify({'error': 'Hora fin inválida'}), 400
+    if hora_fin and not validar_rango_horas(hora_evento, hora_fin):
+        return jsonify({'error': 'Hora fin debe ser posterior a hora inicio'}), 400
+    if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
+        return jsonify({'error': 'Descripción inválida'}), 400
+
+    # Obtener usuario
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    creador_id = user['ID'] if user else 1
+
+    try:
+        crear_evento(
+            nombre=nombre,
+            fecha_evento=fecha_evento,
+            hora_evento=hora_evento+":00",  # asegurar formato completo HH:MM:SS para la BD
+            creador_id=creador_id,
+            fecha_fin=fecha_fin,
+            hora_fin=hora_fin+":00" if hora_fin else None,
+            descripcion=descripcion
+        )
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception:
+        return jsonify({'error': 'Error interno creando evento'}), 500
+
+    # Recuperar el evento recién creado (tomar el último por fecha/hora y nombre)
+    eventos_data = obtener_eventos()
+    creado = next((e for e in reversed(eventos_data) if e['Nombre'] == nombre and str(e['Fecha_evento']) == fecha_evento), None)
+    if not creado:
+        return jsonify({'error': 'Evento creado pero no localizado'}), 500
+
+    evento_obj = Evento(creado)
+    return jsonify(evento_obj.to_fullcalendar()), 201
 
 
 @app.route('/api/tareas/<int:tarea_id>', methods=['PUT'])
