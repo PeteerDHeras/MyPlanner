@@ -20,7 +20,12 @@ class Evento:
         self.fecha_fin = data.get('Fecha_fin')
         self.hora_fin = data.get('Hora_fin')
         self.creador_id = data.get('creadorEvento')
-        self.fecha_creacion = data.get('Fecha_creacion')
+        # La columna real en la BD es 'fecha_creacion' (minúsculas). Si el dict
+        # viene de un origen que ya normalizó a 'Fecha_creacion', admitimos ambos.
+        self.fecha_creacion = (
+            data.get('fecha_creacion')
+            or data.get('Fecha_creacion')
+        )
     
     def to_dict(self):
         """Convierte el evento a un diccionario normalizado."""
@@ -97,7 +102,12 @@ class Tarea:
         self.prioridad = data.get('Prioridad', 1)
         self.estado = int(data.get('Estado', 0))
         self.creador_id = data.get('creadorTarea')
-        self.fecha_creacion = data.get('Fecha_creacion')
+        # Aceptar ambas variantes de la clave por consistencia con SELECT *
+        # y plantillas existentes.
+        self.fecha_creacion = (
+            data.get('fecha_creacion')
+            or data.get('Fecha_creacion')
+        )
     
     def to_dict(self):
         """Convierte la tarea a un diccionario normalizado."""

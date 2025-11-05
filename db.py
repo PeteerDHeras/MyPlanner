@@ -403,9 +403,14 @@ def obtener_tareas():
         cursor.execute("SELECT * FROM tareas")
         tareas = cursor.fetchall()
         for t in tareas:
-            estado = int(t.get('Estado') or t.get('estado') or 0)
-            t['Estado'] = estado  # ← Esto es clave para que Jinja lo compare bien
-            t['Estado_str'] = 'Pendiente' if estado == 0 else 'Completada'
+            # La columna real es 'estado'; normalizamos a 'Estado' para plantillas.
+            estado_val = t.get('estado', 0)
+            try:
+                estado_int = int(estado_val)
+            except (TypeError, ValueError):
+                estado_int = 0
+            t['Estado'] = estado_int
+            t['Estado_str'] = 'Pendiente' if estado_int == 0 else 'Completada'
     conexion.close()
     return tareas
 
