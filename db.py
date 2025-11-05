@@ -151,8 +151,7 @@ def obtener_usuario_por_nombre(nombre):
     conn = get_connection()
     try:
         cursor = conn.cursor(dictionary=True)
-        # Tabla real: usuario
-        cursor.execute("SELECT Id FROM usuario WHERE usuario = %s", (nombre,))
+        cursor.execute("SELECT id FROM usuario WHERE usuario = %s", (nombre,))
         usuario = cursor.fetchone()
         return usuario
     except Exception:
@@ -193,7 +192,7 @@ def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, 
         cursor = conn.cursor()
         # fecha_creacion ahora es TIMESTAMP con DEFAULT CURRENT_TIMESTAMP
         query = """
-            INSERT INTO eventos (Nombre, Descripcion, Fecha_evento, Hora_evento, creadorEvento, Fecha_fin, Hora_fin)
+            INSERT INTO eventos (nombre, descripcion, fecha_evento, hora_evento, creador_evento, fecha_fin, hora_fin)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(query, (nombre, descripcion, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
@@ -235,8 +234,8 @@ def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=Non
         cursor = conn.cursor()
         query = """
             UPDATE eventos
-            SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s, Fecha_fin=%s, Hora_fin=%s, Descripcion=%s
-            WHERE ID=%s
+            SET nombre=%s, fecha_evento=%s, hora_evento=%s, fecha_fin=%s, hora_fin=%s, descripcion=%s
+            WHERE id=%s
         """
         cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, descripcion, evento_id))
         conn.commit()
@@ -258,7 +257,7 @@ def eliminar_evento(evento_id):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM eventos WHERE ID=%s", (evento_id,))
+        cursor.execute("DELETE FROM eventos WHERE id=%s", (evento_id,))
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -270,7 +269,7 @@ def eliminar_evento(evento_id):
 def obtener_eventos():  
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM eventos ORDER BY Fecha_evento ASC, Hora_evento ASC")
+    cursor.execute("SELECT * FROM eventos ORDER BY fecha_evento ASC, hora_evento ASC")
     eventos = cursor.fetchall()
     conn.close()
     return eventos
@@ -305,7 +304,7 @@ def crear_tarea(nombre, descripcion, fecha_limite, prioridad, creador_id, estado
         cursor = conn.cursor()
         # fecha_creacion ahora es TIMESTAMP con DEFAULT CURRENT_TIMESTAMP
         query = """
-            INSERT INTO tareas (Nombre, Descripcion, Fecha_limite, Prioridad, creadorTarea, estado)
+            INSERT INTO tareas (nombre, descripcion, fecha_limite, prioridad, creador_tarea, estado)
             VALUES (%s, %s, %s, %s, %s, %s)
         """
         cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id, estado))
@@ -344,8 +343,8 @@ def modificar_tarea(tarea_id, nombre, descripcion, fecha_limite, prioridad, esta
         cursor = conn.cursor()
         query = """
             UPDATE tareas
-            SET Nombre=%s, Descripcion=%s, Fecha_limite=%s, Prioridad=%s, estado=%s
-            WHERE ID=%s
+            SET nombre=%s, descripcion=%s, fecha_limite=%s, prioridad=%s, estado=%s
+            WHERE id=%s
         """
         cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, estado, tarea_id))
         conn.commit()
@@ -366,7 +365,7 @@ def eliminar_tarea(tarea_id):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM tareas WHERE ID=%s", (tarea_id,))
+        cursor.execute("DELETE FROM tareas WHERE id=%s", (tarea_id,))
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -387,7 +386,7 @@ def actualizar_estado_tarea(tarea_id, estado):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        query = "UPDATE tareas SET estado=%s WHERE ID=%s"
+        query = "UPDATE tareas SET estado=%s WHERE id=%s"
         cursor.execute(query, (estado, tarea_id))
         conn.commit()
     except Exception as e:
@@ -403,14 +402,13 @@ def obtener_tareas():
         cursor.execute("SELECT * FROM tareas")
         tareas = cursor.fetchall()
         for t in tareas:
-            # La columna real es 'estado'; normalizamos a 'Estado' para plantillas.
             estado_val = t.get('estado', 0)
             try:
                 estado_int = int(estado_val)
             except (TypeError, ValueError):
                 estado_int = 0
-            t['Estado'] = estado_int
-            t['Estado_str'] = 'Pendiente' if estado_int == 0 else 'Completada'
+            t['estado'] = estado_int  # asegurar tipo
+            t['estado_str'] = 'Pendiente' if estado_int == 0 else 'Completada'
     conexion.close()
     return tareas
 
@@ -427,12 +425,12 @@ def obtener_resumen_semana():
     query_total = """
         SELECT COUNT(*) AS total
         FROM tareas
-        WHERE Fecha_limite BETWEEN %s AND %s
+        WHERE fecha_limite BETWEEN %s AND %s
     """
     query_completadas = """
         SELECT COUNT(*) AS completadas
         FROM tareas
-        WHERE estado = 1 AND Fecha_limite BETWEEN %s AND %s
+        WHERE estado = 1 AND fecha_limite BETWEEN %s AND %s
     """
 
     cursor.execute(query_total, (inicio_semana, fin_semana))
@@ -453,7 +451,7 @@ def obtener_eventos_manana():
     hoy = datetime.now().date()
     manana = hoy + timedelta(days=1)
 
-    query = "SELECT COUNT(*) AS eventos FROM eventos WHERE Fecha_evento = %s"
+    query = "SELECT COUNT(*) AS eventos FROM eventos WHERE fecha_evento = %s"
     cursor.execute(query, (manana,))
     cantidad = cursor.fetchone()['eventos']
 

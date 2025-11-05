@@ -234,40 +234,24 @@ def crear_evento_view():
             return render_template('nuevo_evento.html', 
                                  error='Nombre inválido o demasiado largo',
                                  fecha_preseleccionada=fecha_evento)
-            return render_template('nuevo_evento.html', 
-                                 error='Fecha inválida',
-                                 fecha_preseleccionada='')
         # No permitir fecha anterior a hoy
         if not validar_fecha_no_pasada(fecha_evento):
             return render_template('nuevo_evento.html', 
                                  error='La fecha del evento no puede ser en el pasado',
                                  fecha_preseleccionada=fecha_evento)
-            return render_template('nuevo_evento.html', 
-                                 error='Hora inválida',
-                                 fecha_preseleccionada=fecha_evento)
+
         # Validar rango de horas si hay fin
         if hora_fin and not validar_rango_horas(hora_evento[:5], hora_fin[:5]):
             return render_template('nuevo_evento.html', error='La hora fin debe ser posterior a la hora inicio', fecha_preseleccionada=fecha_evento)
-            return render_template('nuevo_evento.html', 
-                                 error='Descripción inválida o demasiado larga',
-                                 fecha_preseleccionada=fecha_evento)
-            return render_template('nuevo_evento.html', 
-                                 error='Fecha fin inválida',
-                                 fecha_preseleccionada=fecha_evento)
+
         if fecha_fin and not validar_fecha_no_pasada(fecha_fin):
             return render_template('nuevo_evento.html', 
                                  error='La fecha fin no puede ser en el pasado',
                                  fecha_preseleccionada=fecha_evento)
-            return render_template('nuevo_evento.html', 
-                                 error='Hora fin inválida',
-                                 fecha_preseleccionada=fecha_evento)
-            return render_template('nuevo_evento.html', 
-                                 error='La fecha fin no puede ser anterior a la fecha de inicio',
-                                 fecha_preseleccionada=fecha_evento)
 
         usuario_actual = session.get('usuario')
         user = obtener_usuario_por_nombre(usuario_actual)
-        creador_id = user['ID'] if user else 1
+        creador_id = user['id'] if user else 1
 
         try:
             crear_evento(
@@ -302,7 +286,7 @@ def editar_evento_view(id):
 @login_required
 def ver_evento_view(id):
     """Devuelve un fragmento modal con los datos normalizados del evento."""
-    evento_data = next((e for e in obtener_eventos() if e['ID'] == id), None)
+    evento_data = next((e for e in obtener_eventos() if e.get('id') == id), None)
     if not evento_data:
         return ("Evento no encontrado", 404)
 
@@ -359,7 +343,7 @@ def crear_tarea_view():
 
         usuario_actual = session.get('usuario')
         user = obtener_usuario_por_nombre(usuario_actual)
-        creador_id = user['ID'] if user else 1
+        creador_id = user['id'] if user else 1
 
         try:
             crear_tarea(
@@ -394,7 +378,7 @@ def eliminar_tarea_view(id):
 @login_required
 def ver_tarea_view(id):
     """Fragmento/modal para ver detalles de una tarea (normaliza campos)."""
-    tarea_data = next((t for t in obtener_tareas() if t['ID'] == id), None)
+    tarea_data = next((t for t in obtener_tareas() if t.get('id') == id), None)
     if not tarea_data:
         return ("Tarea no encontrada", 404)
     
@@ -516,7 +500,7 @@ def actualizar_evento_api(evento_id):
         return jsonify({"error": str(e)}), 400
     
     eventos_data = obtener_eventos()
-    evento_data = next((e for e in eventos_data if e['ID'] == evento_id), None)
+    evento_data = next((e for e in eventos_data if e.get('id') == evento_id), None)
     if not evento_data:
         return jsonify({'error': 'Evento actualizado pero no encontrado'}), 500
 
@@ -569,7 +553,7 @@ def crear_evento_api():
     # Obtener usuario
     usuario_actual = session.get('usuario')
     user = obtener_usuario_por_nombre(usuario_actual)
-    creador_id = user['ID'] if user else 1
+    creador_id = user['id'] if user else 1
 
     try:
         crear_evento(
@@ -588,7 +572,8 @@ def crear_evento_api():
 
     # Recuperar el evento recién creado (tomar el último por fecha/hora y nombre)
     eventos_data = obtener_eventos()
-    creado = next((e for e in reversed(eventos_data) if e['Nombre'] == nombre and str(e['Fecha_evento']) == fecha_evento), None)
+    # Recuperar evento recién creado usando SOLO claves minúsculas
+    creado = next((e for e in reversed(eventos_data) if e.get('nombre') == nombre and str(e.get('fecha_evento')) == fecha_evento), None)
     if not creado:
         return jsonify({'error': 'Evento creado pero no localizado'}), 500
 
@@ -655,7 +640,7 @@ def actualizar_tarea_api(tarea_id):
 
     # Obtener tarea actualizada
     tareas_data = obtener_tareas()
-    tarea_data = next((t for t in tareas_data if t['ID'] == tarea_id), None)
+    tarea_data = next((t for t in tareas_data if t.get('id') == tarea_id), None)
     if not tarea_data:
         return jsonify({'error': 'Tarea actualizada pero no encontrada'}), 500
 

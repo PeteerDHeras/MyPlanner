@@ -8,37 +8,36 @@ from datetime import datetime, time
 
 
 class Evento:
-    """Clase simple para representar un evento."""
-    
+    """Representación de un evento usando SOLO claves minúsculas del esquema actual."""
+
     def __init__(self, data):
-        """Inicializa un evento a partir de un diccionario de la BD."""
-        self.id = data.get('ID')
-        self.nombre = data.get('Nombre', '')
-        self.descripcion = data.get('Descripcion', '')
-        self.fecha_evento = data.get('Fecha_evento')
-        self.hora_evento = data.get('Hora_evento')
-        self.fecha_fin = data.get('Fecha_fin')
-        self.hora_fin = data.get('Hora_fin')
-        self.creador_id = data.get('creadorEvento')
-        # La columna real en la BD es 'fecha_creacion' (minúsculas). Si el dict
-        # viene de un origen que ya normalizó a 'Fecha_creacion', admitimos ambos.
-        self.fecha_creacion = (
-            data.get('fecha_creacion')
-            or data.get('Fecha_creacion')
-        )
-    
+        # IDs
+        self.id = data.get('id')
+        # Campos básicos
+        self.nombre = data.get('nombre', '')
+        self.descripcion = data.get('descripcion', '')
+        # Fechas y horas
+        self.fecha_evento = data.get('fecha_evento')
+        self.hora_evento = data.get('hora_evento')
+        self.fecha_fin = data.get('fecha_fin')
+        self.hora_fin = data.get('hora_fin')
+        # Creador
+        self.creador_id = data.get('creador_evento')
+        # Timestamp creación
+        self.fecha_creacion = data.get('fecha_creacion')
+
     def to_dict(self):
-        """Convierte el evento a un diccionario normalizado."""
+        """Convierte el evento a un diccionario con claves en minúsculas."""
         return {
-            'ID': self.id,
-            'Nombre': self.nombre,
-            'Descripcion': self.descripcion,
-            'Fecha_evento': str(self.fecha_evento) if self.fecha_evento else '',
-            'Hora_evento': self._normalizar_hora(self.hora_evento),
-            'Fecha_fin': str(self.fecha_fin) if self.fecha_fin else '',
-            'Hora_fin': self._normalizar_hora(self.hora_fin),
-            'creadorEvento': self.creador_id,
-            'Fecha_creacion': self.fecha_creacion
+            'id': self.id,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'fecha_evento': str(self.fecha_evento) if self.fecha_evento else '',
+            'hora_evento': self._normalizar_hora(self.hora_evento),
+            'fecha_fin': str(self.fecha_fin) if self.fecha_fin else '',
+            'hora_fin': self._normalizar_hora(self.hora_fin),
+            'creador_evento': self.creador_id,
+            'fecha_creacion': self.fecha_creacion
         }
     
     def _normalizar_hora(self, hora_val):
@@ -62,16 +61,15 @@ class Evento:
         hora_inicio = self._normalizar_hora(self.hora_evento) or '00:00'
         hora_fin = self._normalizar_hora(self.hora_fin) or hora_inicio
         fecha_fin = self.fecha_fin or self.fecha_evento
-        # Añadimos extendedProps para conservar descripción (y otros si se necesitan)
         return {
-            "id": self.id,
-            "title": self.nombre,
-            "start": f"{self.fecha_evento}T{hora_inicio}",
-            "end": f"{fecha_fin}T{hora_fin}",
-            "extendedProps": {
-                "descripcion": self.descripcion or '',
-                "fecha_evento": str(self.fecha_evento) if self.fecha_evento else '',
-                "fecha_fin": str(fecha_fin) if fecha_fin else '',
+            'id': self.id,
+            'title': self.nombre,
+            'start': f"{self.fecha_evento}T{hora_inicio}",
+            'end': f"{fecha_fin}T{hora_fin}",
+            'extendedProps': {
+                'descripcion': self.descripcion or '',
+                'fecha_evento': str(self.fecha_evento) if self.fecha_evento else '',
+                'fecha_fin': str(fecha_fin) if fecha_fin else '',
             }
         }
     
@@ -91,36 +89,33 @@ class Evento:
 
 
 class Tarea:
-    """Clase simple para representar una tarea."""
-    
+    """Representación de una tarea usando SOLO claves minúsculas del esquema actual."""
+
     def __init__(self, data):
-        """Inicializa una tarea a partir de un diccionario de la BD."""
-        self.id = data.get('ID')
-        self.nombre = data.get('Nombre', '')
-        self.descripcion = data.get('Descripcion', '')
-        self.fecha_limite = data.get('Fecha_limite')
-        self.prioridad = data.get('Prioridad', 1)
-        self.estado = int(data.get('Estado', 0))
-        self.creador_id = data.get('creadorTarea')
-        # Aceptar ambas variantes de la clave por consistencia con SELECT *
-        # y plantillas existentes.
-        self.fecha_creacion = (
-            data.get('fecha_creacion')
-            or data.get('Fecha_creacion')
-        )
-    
+        self.id = data.get('id')
+        self.nombre = data.get('nombre', '')
+        self.descripcion = data.get('descripcion', '')
+        self.fecha_limite = data.get('fecha_limite')
+        self.prioridad = data.get('prioridad', 1)
+        estado_raw = data.get('estado', 0)
+        try:
+            self.estado = int(estado_raw)
+        except Exception:
+            self.estado = 0
+        self.creador_id = data.get('creador_tarea')
+        self.fecha_creacion = data.get('fecha_creacion')
+
     def to_dict(self):
-        """Convierte la tarea a un diccionario normalizado."""
         return {
-            'ID': self.id,
-            'Nombre': self.nombre,
-            'Descripcion': self.descripcion,
-            'Fecha_limite': str(self.fecha_limite) if self.fecha_limite else '',
-            'Prioridad': self.prioridad,
-            'Estado': self.estado,
-            'Estado_str': 'Completada' if self.estado == 1 else 'Pendiente',
-            'creadorTarea': self.creador_id,
-            'Fecha_creacion': self.fecha_creacion
+            'id': self.id,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'fecha_limite': str(self.fecha_limite) if self.fecha_limite else '',
+            'prioridad': int(self.prioridad) if str(self.prioridad).isdigit() else self.prioridad,
+            'estado': self.estado,
+            'estado_str': 'Completada' if self.estado == 1 else 'Pendiente',
+            'creador_tarea': self.creador_id,
+            'fecha_creacion': self.fecha_creacion
         }
     
     def esta_completada(self):
@@ -130,15 +125,16 @@ class Tarea:
     def to_modal_dict(self):
         """Convierte la tarea a formato compatible con el modal (como evento)."""
         return {
-            'ID': self.id,
-            'Nombre': self.nombre,
-            'Descripcion': self.descripcion,
-            'Fecha_evento': str(self.fecha_limite) if self.fecha_limite else '',
-            'Hora_evento': '',
-            'Fecha_fin': '',
-            'Hora_fin': '',
-            'Prioridad': self.prioridad,
-            'Estado': self.estado
+            'id': self.id,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'fecha_evento': str(self.fecha_limite) if self.fecha_limite else '',
+            'hora_evento': '',
+            'fecha_fin': '',
+            'hora_fin': '',
+            'prioridad': self.prioridad,
+            'estado': self.estado,
+            'estado_str': 'Completada' if self.estado == 1 else 'Pendiente'
         }
     
     def es_de_fecha(self, fecha):

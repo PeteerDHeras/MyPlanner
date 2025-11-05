@@ -7,38 +7,38 @@
     </div>
 
     <form id="modal-form">
-      <input type="hidden" name="id" value="{{ item.ID }}" />
+  <input type="hidden" name="id" value="{{ item.id }}" />
 
       <div class="mb-3">
         <label class="form-label" style="color:#0b0b0b;font-weight:600;">Nombre</label>
-        <input name="nombre" type="text" value="{{ item.Nombre }}" class="form-control" readonly />
+  <input name="nombre" type="text" value="{{ item.nombre }}" class="form-control" readonly />
       </div>
 
       <div class="mb-3">
         <label class="form-label" style="color:#0b0b0b;font-weight:600;">Descripción</label>
-        <textarea name="descripcion" class="form-control" rows="3" readonly>{{ item.Descripcion or '' }}</textarea>
+  <textarea name="descripcion" class="form-control" rows="3" readonly>{{ item.descripcion or '' }}</textarea>
       </div>
 
       <!-- Fecha/Hora (events) or Fecha límite (tasks mapped to Fecha_evento) -->
       <div style="display:flex;gap:10px;">
         <div style="flex:1;">
           <label class="form-label" style="color:#0b0b0b;font-weight:600;">Fecha</label>
-          <input name="fecha_evento" type="date" value="{{ item.Fecha_evento or '' }}" class="form-control" readonly />
+          <input name="fecha_evento" type="date" value="{{ item.fecha_evento or '' }}" class="form-control" readonly />
         </div>
         <div style="width:140px;">
           <label class="form-label" style="color:#0b0b0b;font-weight:600;">Hora</label>
-          <input name="hora_evento" type="time" value="{{ item.Hora_evento or '' }}" class="form-control" readonly />
+          <input name="hora_evento" type="time" value="{{ item.hora_evento or '' }}" class="form-control" readonly />
         </div>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:10px;">
         <div style="flex:1;">
           <label class="form-label" style="color:#0b0b0b;font-weight:600;">Fecha fin (opcional)</label>
-          <input name="fecha_fin" type="date" value="{{ item.Fecha_fin or '' }}" class="form-control" readonly />
+          <input name="fecha_fin" type="date" value="{{ item.fecha_fin or '' }}" class="form-control" readonly />
         </div>
         <div style="width:140px;">
           <label class="form-label" style="color:#0b0b0b;font-weight:600;">Hora fin (opcional)</label>
-          <input name="hora_fin" type="time" value="{{ item.Hora_fin or '' }}" class="form-control" readonly />
+          <input name="hora_fin" type="time" value="{{ item.hora_fin or '' }}" class="form-control" readonly />
         </div>
       </div>
 
@@ -47,16 +47,16 @@
         <div style="flex:1;">
           <label class="form-label">Prioridad</label>
           <select name="prioridad" class="form-select" disabled>
-            <option value="1" {% if item.Prioridad==1 %}selected{% endif %}>Baja</option>
-            <option value="2" {% if item.Prioridad==2 %}selected{% endif %}>Media</option>
-            <option value="3" {% if item.Prioridad==3 %}selected{% endif %}>Alta</option>
+            <option value="1" {% if item.prioridad==1 %}selected{% endif %}>Baja</option>
+            <option value="2" {% if item.prioridad==2 %}selected{% endif %}>Media</option>
+            <option value="3" {% if item.prioridad==3 %}selected{% endif %}>Alta</option>
           </select>
         </div>
         <div style="width:160px;">
           <label class="form-label">Estado</label>
           <select name="estado" class="form-select" disabled>
-            <option value="0" {% if item.get('Estado',0)==0 %}selected{% endif %}>Pendiente</option>
-            <option value="1" {% if item.get('Estado',0)==1 %}selected{% endif %}>Completada</option>
+            <option value="0" {% if item.get('estado',0)==0 %}selected{% endif %}>Pendiente</option>
+            <option value="1" {% if item.get('estado',0)==1 %}selected{% endif %}>Completada</option>
           </select>
         </div>
       </div>

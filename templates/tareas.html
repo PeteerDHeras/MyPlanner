@@ -68,9 +68,9 @@
                 <div class="flex-shrink-0">
                     <input type="checkbox"
                         class="tarea-checkbox h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                        id="tarea-{{ tarea.ID }}"
-                        data-tarea-id="{{ tarea.ID }}"
-                        {% if tarea.Estado == 1 %}checked{% endif %} />
+                        id="tarea-{{ tarea.id }}"
+                        data-tarea-id="{{ tarea.id }}"
+                        {% if tarea.estado == 1 %}checked{% endif %} />
                 </div>
 
                 <!-- Contenido Principal -->
@@ -78,12 +78,12 @@
                     <div class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
                         <!-- Nombre y Descripción -->
                         <div class="flex-grow min-w-0">
-                            <h3 class="text-left text-lg text-gray-900 font-medium leading-tight {% if tarea.Estado == 1 %}line-through text-gray-500{% endif %}">
-                                {{ tarea.Nombre }}
+                            <h3 class="text-left text-lg text-gray-900 font-medium leading-tight {% if tarea.estado == 1 %}line-through text-gray-500{% endif %}">
+                                {{ tarea.nombre }}
                             </h3>
-                            {% if tarea.Descripcion %}
-                            <p class="text-left text-gray-500 text-sm mt-1 line-clamp-1 {% if tarea.Estado == 1 %}line-through{% endif %}">
-                                {{ tarea.Descripcion }}
+                            {% if tarea.descripcion %}
+                            <p class="text-left text-gray-500 text-sm mt-1 line-clamp-1 {% if tarea.estado == 1 %}line-through{% endif %}">
+                                {{ tarea.descripcion }}
                             </p>
                             {% endif %}
                         </div>
@@ -92,25 +92,25 @@
                         <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-sm">
                             <!-- Prioridad -->
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if tarea.Prioridad == 1 %}bg-green-100 text-green-800
-                                {% elif tarea.Prioridad == 2 %}bg-blue-100 text-blue-800
-                                {% elif tarea.Prioridad == 3 %}bg-yellow-100 text-yellow-800
+                                {% if tarea.prioridad == 1 %}bg-green-100 text-green-800
+                                {% elif tarea.prioridad == 2 %}bg-blue-100 text-blue-800
+                                {% elif tarea.prioridad == 3 %}bg-yellow-100 text-yellow-800
                                 {% endif %}">
-                                {% if tarea.Prioridad == 1 %}Baja
-                                {% elif tarea.Prioridad == 2 %}Media
+                                {% if tarea.prioridad == 1 %}Baja
+                                {% elif tarea.prioridad == 2 %}Media
                                 {% else %}Alta{% endif %}
                             </span>
 
                             <!-- Fecha -->
                             <span class="flex items-center text-gray-500 text-sm">
                                 <span class="material-symbols-outlined text-sm mr-1">event</span>
-                                {{ tarea.Fecha_limite }}
+                                {{ tarea.fecha_limite }}
                             </span>
 
                             <!-- Estado -->
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if tarea.Estado == 1 %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ tarea.Estado_str }}
+                                {% if tarea.estado == 1 %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ tarea.estado_str }}
                             </span>
                         </div>
                     </div>
@@ -118,13 +118,13 @@
 
                 <!-- Botones de Acción -->
                 <div class="flex items-center gap-2 flex-shrink-0">
-                    <button data-id="{{ tarea.ID }}" data-type="tarea"
+                    <button data-id="{{ tarea.id }}" data-type="tarea"
                         class="btn-view-task inline-flex items-center justify-center p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100">
                         <span class="material-symbols-outlined text-sm">visibility</span>
                     </button>
                     
                     <!-- edit button removed: editing is available from the 'ver' view -->
-                    <form method="POST" action="{{ url_for('eliminar_tarea_view', id=tarea.ID) }}" class="inline-flex">
+                    <form method="POST" action="{{ url_for('eliminar_tarea_view', id=tarea.id) }}" class="inline-flex">
                         <button type="submit" onclick="return confirm('¿Estás seguro de eliminar esta tarea?')"
                             class="inline-flex items-center justify-center p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50">
                             <span class="material-symbols-outlined text-sm">delete</span>
