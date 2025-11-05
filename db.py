@@ -105,9 +105,10 @@ def get_connection():
         'connection_timeout': 10
     }
     
-    # Si es Aiven (contiene aivencloud.com), habilitar SSL
+    # Si es Aiven (contiene aivencloud.com), habilitar SSL sin verificar identidad
     if 'aivencloud.com' in db_host:
-        connection_config['ssl_verify_identity'] = True
+        connection_config['ssl_verify_cert'] = True
+        connection_config['ssl_verify_identity'] = False
         connection_config['ssl_disabled'] = False
     
     return mysql.connector.connect(**connection_config)
