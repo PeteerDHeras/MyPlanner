@@ -1,4 +1,5 @@
-# 📅 MyPlanner – Agenda virtual y gestor de tareas
+# 📅 MyPlanner – Agenda virtual y gestor de tareas [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+
 
 **Proyecto Final – Ciclo Formativo de Grado Superior en Desarrollo de Aplicaciones Web (DAW)**  
 **Autor:** Pedro José de las Heras Enseñat  
