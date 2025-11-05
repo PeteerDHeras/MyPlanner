@@ -102,10 +102,11 @@ Más detalles en el [manual de configuración](./docs/manual_configuracion.md).
 
 ---
 
-## 📚 Licencia
+## 🪪 Licencia
 
-Este proyecto está licenciado bajo [MIT License](LICENSE).  
-Uso libre con fines educativos y personales.
+Este proyecto está bajo la licencia **Creative Commons BY-NC 4.0**  
+Puedes usarlo y modificarlo libremente para fines **no comerciales**, siempre que cites la autoría.  
+[Ver texto completo de la licencia.](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ---
 
