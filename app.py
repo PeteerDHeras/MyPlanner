@@ -121,8 +121,12 @@ def register():
         password = request.form.get('password', '')
         confirm = request.form.get('confirm', '')
 
-        # Reglas contraseña: min 8, mayúscula, minúscula, dígito, símbolo !@#$%&*._-
-        patron_password = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*._-])[A-Za-z\d!@#$%&*._-]{8,}$'
+        # Reglas contraseña en producción: min 8, mayúscula, minúscula y dígito (SIN símbolos requeridos)
+        patron_password_prod = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$'
+        # En desarrollo permitimos algo más simple (mínimo 4 caracteres) para agilizar pruebas
+        patron_password_dev = r'^.{4,}$'
+        es_produccion = os.getenv('FLASK_ENV') == 'production'
+        patron_password = patron_password_prod if es_produccion else patron_password_dev
 
         # Validaciones básicas
         if not validar_no_vacio(usuario) or not validar_no_vacio(password):
@@ -130,7 +134,8 @@ def register():
         if not validar_longitud(usuario, 50, 3):
             return render_template('register.html', error='Usuario 3-50 caracteres')
         if not re.match(patron_password, password):
-            return render_template('register.html', error='Contraseña no cumple requisitos')
+            msg = 'Contraseña debe tener mínimo 8 caracteres, incluir mayúscula, minúscula y número' if es_produccion else 'Contraseña mínima 4 caracteres (en dev).'
+            return render_template('register.html', error=msg)
         if password != confirm:
             return render_template('register.html', error='Las contraseñas no coinciden')
 
