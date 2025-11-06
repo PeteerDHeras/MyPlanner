@@ -1,22 +1,3 @@
-# ------------------ AJUSTES ADMIN ------------------
-
-@app.route('/ajustes', methods=['GET', 'POST'])
-@login_required
-def ajustes_admin():
-    """Vista de ajustes para admin: permite ver eventos/tareas de cualquier usuario."""
-    usuario_actual = session.get('usuario')
-    user = obtener_usuario_por_nombre(usuario_actual)
-    # Solo admin (rol==3)
-    if not user or user.get('rol', 1) != 3:
-        return redirect(url_for('dashboard'))
-
-    from db import obtener_usuarios, obtener_eventos, obtener_tareas, obtener_auditoria
-    usuarios = obtener_usuarios()
-    usuario_id = request.form.get('usuario_id') if request.method == 'POST' else None
-    eventos = obtener_eventos(usuario_id) if usuario_id else obtener_eventos()
-    tareas = obtener_tareas(usuario_id) if usuario_id else obtener_tareas()
-    auditoria = obtener_auditoria()
-    return render_template('ajustes.html', usuarios=usuarios, usuario_id=usuario_id, eventos=eventos, tareas=tareas, auditoria=auditoria)
 """Aplicación Flask principal.
 
 Este fichero contiene las rutas y vistas del proyecto.
@@ -28,7 +9,7 @@ Notas:
 - Mantén la clave secreta en variables de entorno en producción.
 """
 
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from functools import wraps
 from db import *  # funciones de acceso a datos: obtener_eventos, crear_tarea, etc.
@@ -178,7 +159,8 @@ def register():
 def dashboard():
     """Vista principal que resume eventos y tareas para el usuario.
 
-    - Filtra eventos y tareas del día actual para mostrarlos en el dashboard.
+    - Filtra eventos del día actual para mostrarlos en el dashboard.
+    - Muestra tareas de toda la semana actual.
     - Recupera métricas semanales y eventos de mañana.
     """
     usuario_actual = session.get('usuario')
@@ -186,18 +168,27 @@ def dashboard():
     usuario_id = user['id'] if user else None
     eventos_data = obtener_eventos(usuario_id)
     tareas_data = obtener_tareas(usuario_id)
-    completadas_semana, total_semana = obtener_resumen_semana()  # Opcional: filtrar por usuario si lo deseas
-    eventos_manana = obtener_eventos_manana()  # Opcional: filtrar por usuario si lo deseas
+    completadas_semana, total_semana = obtener_resumen_semana(usuario_id)  # Filtrado por usuario
+    eventos_manana = obtener_eventos_manana(usuario_id)  # Filtrado por usuario
     fecha_hoy = datetime.now().date()
+    
+    # Calcular inicio y fin de la semana actual
+    inicio_semana = fecha_hoy - timedelta(days=fecha_hoy.weekday())  # Lunes
+    fin_semana = inicio_semana + timedelta(days=6)  # Domingo
 
     # Usar funciones de filtrado
     eventos_hoy = filtrar_eventos_por_fecha(eventos_data, fecha_hoy)
-    tareas_hoy = filtrar_tareas_por_fecha(tareas_data, fecha_hoy)
+    
+    # Filtrar tareas de toda la semana
+    tareas_semana = [
+        t for t in tareas_data
+        if t.get('fecha_limite') and inicio_semana <= t.get('fecha_limite') <= fin_semana
+    ]
 
     return render_template(
         'dashboard.html',
         eventos_hoy=eventos_hoy[:5],
-        tareas_hoy=tareas_hoy,
+        tareas_hoy=tareas_semana,  # Cambiado a tareas de la semana
         completadas_semana=completadas_semana,
         total_semana=total_semana,
         eventos_manana=eventos_manana,
@@ -332,9 +323,9 @@ def eliminar_evento_view(id):
         return "Evento no encontrado", 404
     if not es_admin and evento.get('creador_evento') != usuario_id:
         return "No tienes permiso para eliminar este evento", 403
-    from db import registrar_auditoria
+    # from db import registrar_auditoria  # DESHABILITADO - tabla no existe
     eliminar_evento(id)
-    registrar_auditoria(usuario_actual, 'eliminar', 'evento', id)
+    # registrar_auditoria(usuario_actual, 'eliminar', 'evento', id)  # DESHABILITADO
     return redirect(url_for('ver_eventos'))
 
 
@@ -415,9 +406,9 @@ def eliminar_tarea_view(id):
         return "Tarea no encontrada", 404
     if not es_admin and tarea.get('creador_tarea') != usuario_id:
         return "No tienes permiso para eliminar esta tarea", 403
-    from db import registrar_auditoria
+    # from db import registrar_auditoria  # DESHABILITADO - tabla no existe
     eliminar_tarea(id)
-    registrar_auditoria(usuario_actual, 'eliminar', 'tarea', id)
+    # registrar_auditoria(usuario_actual, 'eliminar', 'tarea', id)  # DESHABILITADO
     return redirect(url_for('ver_tareas'))
 
 
@@ -476,7 +467,7 @@ def api_eventos():
 @app.route('/api/eventos/<int:evento_id>', methods=['PUT'])
 @login_required
 def actualizar_evento_api(evento_id):
-    from db import registrar_auditoria
+    # from db import registrar_auditoria  # DESHABILITADO - tabla no existe
     usuario_actual = session.get('usuario')
     user = obtener_usuario_por_nombre(usuario_actual)
     usuario_id = user['id'] if user else None
@@ -647,7 +638,7 @@ def crear_evento_api():
 @app.route('/api/tareas/<int:tarea_id>', methods=['PUT'])
 @login_required
 def actualizar_tarea_api(tarea_id):
-    from db import registrar_auditoria
+    # from db import registrar_auditoria  # DESHABILITADO - tabla no existe
     usuario_actual = session.get('usuario')
     user = obtener_usuario_por_nombre(usuario_actual)
     usuario_id = user['id'] if user else None
@@ -723,6 +714,28 @@ def actualizar_tarea_api(tarea_id):
     tarea = Tarea(tarea_data)
     return jsonify(tarea.to_dict()), 200
 
+
+# ------------------ AJUSTES ADMIN ------------------
+
+@app.route('/ajustes', methods=['GET', 'POST'])
+@login_required
+def ajustes_admin():
+    """Vista de ajustes para admin: permite ver eventos/tareas de cualquier usuario."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    # Solo admin (rol==3)
+    if not user or user.get('rol', 1) != 3:
+        return redirect(url_for('dashboard'))
+
+    from db import obtener_usuarios, obtener_eventos, obtener_tareas, obtener_auditoria
+    usuarios = obtener_usuarios()
+    usuario_id = request.form.get('usuario_id') if request.method == 'POST' else None
+    eventos = obtener_eventos(usuario_id) if usuario_id else obtener_eventos()
+    tareas = obtener_tareas(usuario_id) if usuario_id else obtener_tareas()
+    auditoria = obtener_auditoria()
+    return render_template('ajustes.html', usuarios=usuarios, usuario_id=usuario_id, eventos=eventos, tareas=tareas, auditoria=auditoria)
+
+
 if __name__ == '__main__':
     # Nota: en producción no usar debug=True y exponer la app directamente.
-        app.run(host="0.0.0.0", port=int(os.getenv('PORT', 5001)), debug=os.getenv('FLASK_ENV', 'development') != 'production')
+    app.run(host="0.0.0.0", port=int(os.getenv('PORT', 5001)), debug=os.getenv('FLASK_ENV', 'development') != 'production')

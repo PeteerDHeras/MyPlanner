@@ -77,26 +77,12 @@ def get_connection():
         'connection_timeout': 10
     }
     
-    # Si es Aiven (contiene aivencloud.com), habilitar SSL
+    # Si es Aiven (contiene aivencloud.com), habilitar SSL sin verificación para desarrollo local
     if 'aivencloud.com' in db_host:
-        db_ssl_ca = os.getenv('DB_SSL_CA')
-        
-        if db_ssl_ca:
-            # Si hay certificado en variable de entorno, guardarlo temporalmente
-            import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as cert_file:
-                cert_file.write(db_ssl_ca)
-                cert_path = cert_file.name
-            
-            connection_config['ssl_ca'] = cert_path
-            connection_config['ssl_verify_cert'] = True
-            connection_config['ssl_verify_identity'] = True
-        else:
-            # Sin certificado, usar SSL pero sin verificar identidad
-            connection_config['ssl_verify_cert'] = True
-            connection_config['ssl_verify_identity'] = False
-        
+        # Para desarrollo local: SSL habilitado pero sin verificar certificados
         connection_config['ssl_disabled'] = False
+        connection_config['ssl_verify_cert'] = False
+        connection_config['ssl_verify_identity'] = False
     
     return mysql.connector.connect(**connection_config)
 
@@ -419,8 +405,8 @@ def obtener_tareas(usuario_id=None):
     return tareas
 
 # OBTENER RESUMEN SEMANA
-def obtener_resumen_semana():
-    """Devuelve el número total de tareas y las completadas en la semana actual."""
+def obtener_resumen_semana(usuario_id=None):
+    """Devuelve el número total de tareas y las completadas en la semana actual del usuario."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -428,37 +414,58 @@ def obtener_resumen_semana():
     inicio_semana = hoy - timedelta(days=hoy.weekday())       # Lunes
     fin_semana = inicio_semana + timedelta(days=6)            # Domingo
 
-    query_total = """
-        SELECT COUNT(*) AS total
-        FROM tareas
-        WHERE fecha_limite BETWEEN %s AND %s
-    """
-    query_completadas = """
-        SELECT COUNT(*) AS completadas
-        FROM tareas
-        WHERE estado = 1 AND fecha_limite BETWEEN %s AND %s
-    """
+    if usuario_id:
+        query_total = """
+            SELECT COUNT(*) AS total
+            FROM tareas
+            WHERE fecha_limite BETWEEN %s AND %s AND creador_tarea = %s
+        """
+        query_completadas = """
+            SELECT COUNT(*) AS completadas
+            FROM tareas
+            WHERE estado = 1 AND fecha_limite BETWEEN %s AND %s AND creador_tarea = %s
+        """
+        cursor.execute(query_total, (inicio_semana, fin_semana, usuario_id))
+        total = cursor.fetchone()['total']
 
-    cursor.execute(query_total, (inicio_semana, fin_semana))
-    total = cursor.fetchone()['total']
+        cursor.execute(query_completadas, (inicio_semana, fin_semana, usuario_id))
+        completadas = cursor.fetchone()['completadas']
+    else:
+        query_total = """
+            SELECT COUNT(*) AS total
+            FROM tareas
+            WHERE fecha_limite BETWEEN %s AND %s
+        """
+        query_completadas = """
+            SELECT COUNT(*) AS completadas
+            FROM tareas
+            WHERE estado = 1 AND fecha_limite BETWEEN %s AND %s
+        """
+        cursor.execute(query_total, (inicio_semana, fin_semana))
+        total = cursor.fetchone()['total']
 
-    cursor.execute(query_completadas, (inicio_semana, fin_semana))
-    completadas = cursor.fetchone()['completadas']
+        cursor.execute(query_completadas, (inicio_semana, fin_semana))
+        completadas = cursor.fetchone()['completadas']
 
     conn.close()
     return completadas, total
 
 # OBTENER EVENTOS DE MAÑANA
-def obtener_eventos_manana():
-    """Devuelve el número de eventos del día siguiente."""
+def obtener_eventos_manana(usuario_id=None):
+    """Devuelve el número de eventos del día siguiente del usuario."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
     hoy = datetime.now().date()
     manana = hoy + timedelta(days=1)
 
-    query = "SELECT COUNT(*) AS eventos FROM eventos WHERE fecha_evento = %s"
-    cursor.execute(query, (manana,))
+    if usuario_id:
+        query = "SELECT COUNT(*) AS eventos FROM eventos WHERE fecha_evento = %s AND creador_evento = %s"
+        cursor.execute(query, (manana, usuario_id))
+    else:
+        query = "SELECT COUNT(*) AS eventos FROM eventos WHERE fecha_evento = %s"
+        cursor.execute(query, (manana,))
+    
     cantidad = cursor.fetchone()['eventos']
 
     conn.close()
@@ -474,20 +481,24 @@ def obtener_usuarios():
     return usuarios
 
 def registrar_auditoria(usuario, accion, tipo, objeto_id):
-    """Registra una acción en la tabla auditoria."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    query = "INSERT INTO auditoria (usuario, accion, tipo, objeto_id, fecha) VALUES (%s, %s, %s, %s, NOW())"
-    cursor.execute(query, (usuario, accion, tipo, objeto_id))
-    conn.commit()
-    conn.close()
+    """Registra una acción en la tabla auditoria. DESHABILITADA - tabla no existe."""
+    # TODO: Crear tabla auditoria en la base de datos
+    pass
+    # conn = get_connection()
+    # cursor = conn.cursor()
+    # query = "INSERT INTO auditoria (usuario, accion, tipo, objeto_id, fecha) VALUES (%s, %s, %s, %s, NOW())"
+    # cursor.execute(query, (usuario, accion, tipo, objeto_id))
+    # conn.commit()
+    # conn.close()
 
 def obtener_auditoria():
-    """Devuelve las últimas acciones registradas en auditoria."""
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM auditoria ORDER BY fecha DESC LIMIT 50")
-    registros = cursor.fetchall()
-    conn.close()
-    return registros
+    """Devuelve las últimas acciones registradas en auditoria. DESHABILITADA - tabla no existe."""
+    # TODO: Crear tabla auditoria en la base de datos
+    return []
+    # conn = get_connection()
+    # cursor = conn.cursor(dictionary=True)
+    # cursor.execute("SELECT * FROM auditoria ORDER BY fecha DESC LIMIT 50")
+    # registros = cursor.fetchall()
+    # conn.close()
+    # return registros
 
