@@ -89,7 +89,10 @@
         </aside>
 
         <!-- Main Contenido -->
-        <main class="flex-grow-1 bg-background-light">
+        <!-- Añadido padding superior e inferior para separar el contenido del borde superior
+             sin afectar al sidebar. Usamos clases responsive para un término medio en móvil y
+             más aire en pantallas grandes. -->
+        <main class="flex-grow-1 bg-background-light pt-6 pb-5 px-3 px-md-4 pt-md-8">
             {% block content %}{% endblock %}
             <div class="row mt-3">
                 <div class="col-12">

@@ -76,21 +76,19 @@
 				</div>
 			</div>
 
-			<!-- Próximos Eventos Hoy -->
+			<!-- Eventos de la Semana -->
 			<div class="bg-card-light p-6 rounded-xl shadow-sm flex flex-col items-start gap-4">
 				<h2 class="text-gray-900 text-[22px] font-bold leading-tight tracking-[-0.015em]">
-					Próximos Eventos Hoy
+					Eventos de la Semana
 				</h2>
 
-				<!-- Lista de eventos hoy -->
+				<!-- Lista de eventos semana -->
 				<div class="flex flex-col gap-2 w-full">
-					{% if eventos_hoy %}
-					{% for evento in eventos_hoy %}
-					<div
-						class="flex items-center gap-4 bg-card-light px-4 min-h-[72px] py-2 justify-between border-b border-gray-200 last:border-b-0">
+					{% if eventos_semana %}
+					{% for evento in eventos_semana %}
+					<div class="flex items-center gap-4 bg-card-light px-4 min-h-[72px] py-2 justify-between border-b border-gray-200 last:border-b-0">
 						<div class="flex items-center gap-4">
-							<div
-								class="text-gray-600 flex items-center justify-center rounded-lg bg-gray-100 shrink-0 size-12">
+							<div class="text-gray-600 flex items-center justify-center rounded-lg bg-gray-100 shrink-0 size-12">
 								<span class="material-symbols-outlined">
 									{% if 'reunión' in evento.nombre|lower %}
 									groups
@@ -103,38 +101,35 @@
 									{% endif %}
 								</span>
 							</div>
-
 							<div class="flex flex-col justify-center items-start">
 								<p class="text-gray-900 text-base font-medium leading-normal line-clamp-1">
 									{{ evento.nombre }}
 								</p>
-								<p class="text-gray-500 text-sm font-normal leading-normal line-clamp-2">
+								<p class="text-gray-500 text-sm mt-1 font-normal leading-normal line-clamp-2">
+									<span class="text-xs font-medium mr-2 rounded-full bg-gray-100 text-gray-600">{{ evento.label_fecha or evento.fecha_evento }}</span>
 									{%- set _hora = evento.hora_evento|string -%}
 									{%- if _hora -%}
-									{{ _hora.split(':')[:2]|join(':') }}
+									{{ _hora.split(':')[:2]|join(':') }} 
 									{%- else -%}
-
+									&nbsp;
 									{%- endif -%}
 								</p>
+								<!-- <p class="text-xs font-medium mt-2 rounded-full bg-gray-100 text-gray-600">{{ evento.label_fecha or evento.fecha_evento }}</p> -->
 							</div>
 						</div>
-
 						<div class="shrink-0">
-							<button data-id="{{ evento.id }}" data-type="evento"
-								class="link-view-event text-primary text-sm font-medium leading-normal hover:underline bg-transparent border-0 p-0">
+							<button data-id="{{ evento.id }}" data-type="evento" class="link-view-event text-primary text-sm font-medium leading-normal hover:underline bg-transparent border-0 p-0">
 								Ver Detalles
 							</button>
 						</div>
 					</div>
 					{% endfor %}
 					{% else %}
-					<p class="text-gray-500 text-sm">No hay eventos hoy.</p>
+					<p class="text-gray-500 text-sm">No hay eventos esta semana.</p>
 					{% endif %}
 				</div>
-
 				<div class="flex justify-end w-full mt-2">
-					<a href="{{ url_for('ver_eventos') }}"
-						class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 flex items-center rounded-lg gap-2">
+					<a href="{{ url_for('ver_eventos') }}" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 flex items-center rounded-lg gap-2">
 						<span class="material-symbols-outlined">event</span>
 						Ver todos los eventos
 					</a>

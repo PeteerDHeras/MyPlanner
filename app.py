@@ -186,10 +186,48 @@ def dashboard():
     inicio_semana = fecha_hoy - timedelta(days=fecha_hoy.weekday())  # Lunes
     fin_semana = inicio_semana + timedelta(days=6)  # Domingo
 
-    # Usar funciones de filtrado
+    # Usar funciones de filtrado para hoy
     eventos_hoy = filtrar_eventos_por_fecha(eventos_data, fecha_hoy)
-    
-    # Filtrar tareas de toda la semana
+
+    # NUEVO: Filtrar todos los eventos de la semana (lunes-domingo)
+    eventos_semana = []
+    for e in eventos_data:
+        fecha_str = e.get('fecha_evento') or e.get('fecha_limite')  # por si estructura distinta
+        if not fecha_str:
+            continue
+        try:
+            fecha_e = datetime.strptime(str(fecha_str), '%Y-%m-%d').date()
+        except Exception:
+            continue
+        if inicio_semana <= fecha_e <= fin_semana:
+            eventos_semana.append(e)
+
+    # Ordenar eventos de la semana por fecha y hora
+    def _clave_orden(ev):
+        f = ev.get('fecha_evento') or ev.get('fecha_limite') or '2099-12-31'
+        h = ev.get('hora_evento') or ev.get('hora_fin') or '23:59'
+        return (f, h)
+    eventos_semana = sorted(eventos_semana, key=_clave_orden)
+
+    # Etiquetas humanizadas para las fechas de la semana
+    hoy = fecha_hoy
+    manana = hoy + timedelta(days=1)
+    nombres_dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    for ev in eventos_semana:
+        fecha_str = ev.get('fecha_evento') or ev.get('fecha_limite')
+        try:
+            f = datetime.strptime(str(fecha_str), '%Y-%m-%d').date()
+        except Exception:
+            ev['label_fecha'] = fecha_str
+            continue
+        if f == hoy:
+            ev['label_fecha'] = 'Hoy'
+        elif f == manana:
+            ev['label_fecha'] = 'Mañana'
+        else:
+            ev['label_fecha'] = nombres_dias[f.weekday()]
+
+    # Filtrar tareas de toda la semana (ya existente)
     tareas_semana = [
         t for t in tareas_data
         if t.get('fecha_limite') and inicio_semana <= t.get('fecha_limite') <= fin_semana
@@ -198,7 +236,8 @@ def dashboard():
     return render_template(
         'dashboard.html',
         eventos_hoy=eventos_hoy[:5],
-        tareas_hoy=tareas_semana,  # Cambiado a tareas de la semana
+        tareas_hoy=tareas_semana,  # Tareas de la semana
+        eventos_semana=eventos_semana,  # NUEVO: todos los eventos de la semana
         completadas_semana=completadas_semana,
         total_semana=total_semana,
         eventos_manana=eventos_manana,
@@ -393,7 +432,7 @@ def crear_tarea_view():
                 creador_id=creador_id,
                 estado=0  # Por defecto
             )
-            return redirect(url_for('ver_tareas'))
+            return redirect(url_for('dashboard'))
         except ValueError as e:
             return render_template('nueva_tarea.html', error=str(e))
 
