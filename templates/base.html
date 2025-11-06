@@ -25,17 +25,27 @@
 </head>
 
 <body class="bg-light text-light">
+
+
+    <!-- Responsive Sidebar & Hamburger -->
     <div class="d-flex" style="min-height:100vh;">
-        <aside role="complementary" aria-label="Sidebar" class="bg-dark text-light flex-shrink-0 p-3"
-            style="width:16rem;">
+        <!-- Hamburger button (visible on mobile) -->
+        <button id="sidebarToggle" class="btn btn-dark d-md-none position-fixed" style="top:16px;left:16px;z-index:1100;">
+            <span class="fa fa-bars"></span>
+        </button>
+
+        <!-- Sidebar -->
+        <aside role="complementary" aria-label="Sidebar" id="sidebar" class="bg-dark text-light flex-shrink-0 p-3 sidebar-responsive"
+            style="width:16rem;transition:left 0.3s;left:0;z-index:1090;">
             <div class="d-flex flex-column" style="gap:.75rem;">
+                <!-- Usuario  -->
                 <div class="d-flex align-items-center gap-3 mb-2">
                     <div class="rounded-circle"
                         style="width:48px; height:48px; background-size:cover; background-position:center; background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC8w4gQAUyg__Pz5qUJG_E3XTetshO4_YIKFMqQKyOOBlh6o2nVxUlpwcK8JyDMCcUF8NneXp_NFdOXFCTSluwSVi96yPDxjCr4_bA9NhMlxZ6IECv90ys-HxLlB4GqnZAtAG6HUOagtP9ZaHHUOSQokZLtU3FRXAdnI79j-54cE77VNZT2B_vlkf9VOlCVX2nAxdiIjDDpe2LlA52k_A3GnIB5zIhg6KPjO6tcx0bMZclABUUuDnlL5g-EF9gjDyOI9VX7wzjF-pk');">
                     </div>
                     <h1 class="h6 mb-0"><strong>{{ session['usuario'] }}</strong></h1>
                 </div>
-
+                <!-- Navbar Links -->
                 <nav aria-label="Main navigation">
                     <ul class="nav nav-pills flex-column">
                         <li class="nav-item mb-1">
@@ -51,7 +61,7 @@
                             </a>
                         </li>
                         <li class="nav-item mb-1">
-                            <a href="{{ url_for('events') }}" class="nav-link text-light sidebar-link">
+                            <a href="{{ url_for('ver_eventos') }}" class="nav-link text-light sidebar-link">
                                 <i class="fa fa-calendar-day me-2" aria-hidden="true"></i>
                                 <span>Eventos</span>
                             </a>
@@ -62,12 +72,13 @@
                                 <span>Tareas</span>
                             </a>
                         </li>
-
+                        <!-- Iniciar/Cerrar sesión -->
                         <li class="nav-item mt-3">
                             {% if session.get('usuario') %}
-                            <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100">Cerrar sesión</a>
+                            <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100 mb-2">Cerrar sesión</a>
                             {% else %}
-                            <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100">Iniciar sesión</a>
+                            <a href="{{ url_for('login') }}" class="btn btn-outline-light w-100 mb-2">Iniciar sesión</a>
+                            <a href="{{ url_for('register') }}" class="btn btn-success w-100">Registrarse</a>
                             {% endif %}
                         </li>
                     </ul>
@@ -75,10 +86,12 @@
             </div>
         </aside>
 
+        <!-- Main Contenido -->
         <main class="flex-grow-1 p-8 bg-background-light">
             {% block content %}{% endblock %}
             <div class="row mt-3">
                 <div class="col-12">
+                    <!-- Footer -->
                     <footer class="d-flex justify-content-between align-items-center small text-muted border-top pt-3">
                         <div>MyPlanner • Versión 0.1</div>
                         <div>
@@ -91,9 +104,69 @@
         </main>
     </div>
 
+    <script>
+    // Sidebar responsive toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        var sidebar = document.getElementById('sidebar');
+        var toggleBtn = document.getElementById('sidebarToggle');
+        function closeSidebar() {
+            sidebar.style.left = '-18rem';
+        }
+        function openSidebar() {
+            sidebar.style.left = '0';
+        }
+        // Inicialmente oculto en móvil
+        function checkWidth() {
+            if (window.innerWidth < 768) {
+                closeSidebar();
+                toggleBtn.style.display = '';
+            } else {
+                openSidebar();
+                toggleBtn.style.display = 'none';
+            }
+        }
+        checkWidth();
+        window.addEventListener('resize', checkWidth);
+        toggleBtn.addEventListener('click', function() {
+            if (sidebar.style.left === '0px' || sidebar.style.left === '0') {
+                closeSidebar();
+            } else {
+                openSidebar();
+            }
+        });
+        // Cerrar sidebar al hacer click fuera en móvil
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth < 768 && sidebar.style.left === '0px') {
+                if (!sidebar.contains(e.target) && e.target !== toggleBtn) {
+                    closeSidebar();
+                }
+            }
+        });
+    });
+    </script>
+
 
     <!-- FullCalendar JS -->
     <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+        {# Mensajes flash -> se muestran como toast y fallback alert oculto #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="position:absolute;left:-9999px;top:-9999px;">
+                {% for category, msg in messages %}
+                    <div class="flash-msg" data-category="{{ category }}">{{ msg }}</div>
+                {% endfor %}
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function(){
+                    document.querySelectorAll('.flash-msg').forEach(function(el){
+                        var cat = el.getAttribute('data-category') || 'success';
+                        var text = el.textContent.trim();
+                        try { showToast(text, cat === 'error' ? 'error' : 'success'); } catch(e) {}
+                    });
+                });
+            </script>
+        {% endif %}
+        {% endwith %}
 </body>
 
 </html>

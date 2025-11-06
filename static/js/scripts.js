@@ -1,88 +1,431 @@
+/**
+ * SCRIPTS.JS - JavaScript Principal del Proyecto
+ * 
+ * Este archivo contiene toda la lógica del lado del cliente para:
+ * - Gestión del calendario interactivo (FullCalendar)
+ * - Búsqueda en vivo de tareas y eventos
+ * - Actualización dinámica de estados de tareas (checkboxes)
+ * - Sistema de modales para ver/editar/eliminar eventos y tareas
+ * - Notificaciones toast
+ * - Manipulación del DOM sin recargar página
+ * 
+ * Estructura del archivo:
+ * 1. Funciones helper globales (toast, updateItemInDOM, removeItemFromDOM)
+ * 2. Inicialización del calendario (FullCalendar)
+ * 3. Búsqueda en vivo (tareas y eventos)
+ * 4. Gestión de checkboxes de tareas
+ * 5. Sistema de modales (ver/editar/eliminar)
+ */
+
+// ============================================================================
+// SECCIÓN 1: FUNCIONES HELPER GLOBALES
+// ============================================================================
+// Estas funciones están en el scope global para ser accesibles desde todos 
+// los event listeners y handlers, incluyendo los que se crean dinámicamente
+
+/**
+ * Muestra una notificación temporal en la esquina superior derecha
+ * @param {string} message - Mensaje a mostrar
+ * @param {string} type - Tipo de toast: 'success', 'error', 'info'
+ */
+function showToast(message, type) {
+  const colors = { success: '#16a34a', error: '#dc2626', info: '#0ea5e9' };
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.position = 'fixed';
+  toast.style.right = '16px';
+  toast.style.top = '16px';
+  toast.style.background = colors[type] || '#333';
+  toast.style.color = '#fff';
+  toast.style.padding = '8px 12px';
+  toast.style.borderRadius = '6px';
+  toast.style.boxShadow = '0 6px 18px rgba(0,0,0,0.12)';
+  toast.style.zIndex = 9999;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 300ms'; }, 1400);
+  setTimeout(() => toast.remove(), 2000);
+}
+
+/**
+ * Actualiza un evento o tarea en el DOM sin recargar la página
+ * Implementa "optimistic updates" para una experiencia más fluida
+ * 
+ * @param {string} type - Tipo de item: 'evento' o 'tarea'
+ * @param {string|number} id - ID del elemento a actualizar
+ * @param {Object} payload - Objeto con los nuevos datos del elemento
+ * @returns {boolean} - true si se actualizó correctamente, false si no se encontró el elemento
+ */
+function updateItemInDOM(type, id, payload) {
+  if (type === 'evento') {
+    // --- ACTUALIZACIÓN DE EVENTOS ---
+    // Buscar el botón del evento en el DOM
+    const btn = document.querySelector(`.btn-view-event[data-id="${id}"]`);
+    if (!btn) {
+      console.warn('No se encontró el botón del evento para actualizar');
+      return false;
+    }
+    // Navegar al contenedor del card
+    const card = btn.closest('.flex.flex-col.items-stretch') || btn.closest('[class*="p-4"]');
+    if (!card) {
+      console.warn('No se encontró el contenedor del evento');
+      return false;
+    }
+    
+    // Actualizar título del evento
+    const title = card.querySelector('p.text-text-light.text-lg.font-bold') || card.querySelector('p.text-lg') || card.querySelector('h3');
+    if (title && payload.nombre) {
+      title.textContent = payload.nombre;
+    }
+    
+    // Actualizar fecha - buscar el párrafo que contiene el icono calendar_today
+    const parrafos = card.querySelectorAll('p.text-gray-500.text-sm');
+    if (parrafos && parrafos.length >= 2) {
+      // Primer párrafo: fecha (icono calendar_today)
+      if (payload.fecha_evento) {
+        const fechaText = parrafos[0].childNodes;
+        // El texto está después del span del icono
+        if (fechaText.length > 1) {
+          fechaText[fechaText.length - 1].textContent = ' ' + payload.fecha_evento;
+        }
+      }
+      // Segundo párrafo: hora (icono schedule)
+      if (payload.hora_evento) {
+        const horaText = parrafos[1].childNodes;
+        if (horaText.length > 1) {
+          const horaFormateada = payload.hora_evento.toString().slice(0, 5);
+          horaText[horaText.length - 1].textContent = ' ' + horaFormateada;
+        }
+      }
+    }
+    return true;
+  }
+
+  if (type === 'tarea') {
+    // --- ACTUALIZACIÓN DE TAREAS ---
+    // Intentar localizar la tarea: preferir checkbox, sino botón de ver/editar
+    let anchor = document.querySelector(`.tarea-checkbox[data-tarea-id="${id}"]`);
+    if (!anchor) anchor = document.querySelector(`.btn-view-task[data-id="${id}"]`);
+    if (!anchor) anchor = document.querySelector(`[data-id="${id}"]`);
+    if (!anchor) {
+      console.warn('No se encontró la tarea para actualizar');
+      return false;
+    }
+    
+    // Buscar el contenedor de la fila (nueva estructura con flex)
+    let row = anchor.closest('.flex.items-center.gap-4');
+    if (!row) {
+      // fallback: estructura antigua con cards
+      row = anchor.closest('.card');
+    }
+    if (!row) {
+      console.warn('No se encontró el contenedor de la tarea');
+      return false;
+    }
+
+    // Actualizar título (h3)
+    const title = row.querySelector('h3.text-lg') || row.querySelector('.card-title') || row.querySelector('h6') || row.querySelector('h5');
+    if (title && payload.nombre) {
+      title.textContent = payload.nombre;
+      // mantener estilo de línea si está completada
+      const isCompleted = title.classList.contains('line-through');
+      if (!isCompleted && payload.estado && parseInt(payload.estado) === 1) {
+        title.classList.add('line-through', 'text-gray-500');
+      } else if (isCompleted && (!payload.estado || parseInt(payload.estado) === 0)) {
+        title.classList.remove('line-through', 'text-gray-500');
+      }
+    }
+    
+    // Actualizar descripción
+    const desc = row.querySelector('p.text-gray-500.text-sm.mt-1') || row.querySelector('.card-text') || row.querySelector('p.text-secondary');
+    if (desc && payload.descripcion !== undefined) {
+      desc.textContent = payload.descripcion;
+    }
+    
+    // Actualizar fecha
+    const fechaSpan = row.querySelector('span.flex.items-center.text-gray-500') || row.querySelector('span.text-secondary');
+    if (fechaSpan && payload.fecha_evento) {
+      // El texto está después del icono
+      const textNode = Array.from(fechaSpan.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+      if (textNode) {
+        textNode.textContent = ' ' + payload.fecha_evento;
+      }
+    }
+    
+    // Actualizar badge de prioridad
+    if (payload.prioridad) {
+      const prioBadges = row.querySelectorAll('span.inline-flex.items-center.px-2\\.5');
+      const prioBadge = prioBadges[0]; // el primero suele ser prioridad
+      if (prioBadge) {
+        const p = parseInt(payload.prioridad, 10);
+        prioBadge.textContent = p === 1 ? 'Baja' : (p === 2 ? 'Media' : 'Alta');
+        // actualizar colores
+        prioBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ';
+        if (p === 1) {
+          prioBadge.className += 'bg-green-100 text-green-800';
+        } else if (p === 2) {
+          prioBadge.className += 'bg-blue-100 text-blue-800';
+        } else {
+          prioBadge.className += 'bg-yellow-100 text-yellow-800';
+        }
+      }
+    }
+    
+    // Actualizar badge de estado
+    if (payload.estado !== undefined) {
+      const badges = row.querySelectorAll('span.inline-flex.items-center.px-2\\.5');
+      const estadoBadge = badges.length > 1 ? badges[badges.length - 1] : null; // el último suele ser estado
+      if (estadoBadge) {
+        const estado = parseInt(payload.estado, 10);
+        estadoBadge.textContent = estado === 1 ? 'Completada' : 'Pendiente';
+        estadoBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ';
+        estadoBadge.className += estado === 1 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+      }
+    }
+    
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Elimina un elemento (evento o tarea) del DOM después de ser eliminado del servidor
+ * Navega por la estructura del DOM para encontrar y eliminar el contenedor completo
+ * 
+ * @param {string} type - Tipo de item: 'evento' o 'tarea'
+ * @param {string|number} id - ID del elemento a eliminar
+ */
+function removeItemFromDOM(type, id) {
+  if (type === 'evento') {
+    // --- ELIMINACIÓN DE EVENTOS ---
+    const btn = document.querySelector(`.btn-view-event[data-id="${id}"]`);
+    if (!btn) {
+      console.warn('No se encontró el botón del evento en el DOM');
+      return;
+    }
+    // Buscar el contenedor navegando hacia arriba desde el botón
+    // La estructura es: div.p-4 > div.flex (card) > div (contenido) > div (botones) > button
+    // Subimos 5 niveles para llegar al .p-4
+    let container = btn.parentElement; // div de botones
+    if (container) container = container.parentElement; // div de contenido
+    if (container) container = container.parentElement; // div.flex (card completo)
+    if (container) container = container.parentElement; // div.p-4
+    
+    if (container) {
+      console.log('Eliminando contenedor del evento (método parentElement):', container);
+      container.remove();
+      return;
+    }
+    
+    // fallback: buscar por clase
+    console.warn('Método parentElement falló, intentando con closest');
+    container = btn.closest('[class*="p-4"]');
+    if (container) {
+      console.log('Eliminando contenedor del evento (método closest):', container);
+      container.remove();
+      return;
+    }
+    
+    console.error('No se pudo encontrar el contenedor para eliminar');
+    return;
+  }
+  if (type === 'tarea') {
+    // --- ELIMINACIÓN DE TAREAS ---
+    const checkbox = document.querySelector(`.tarea-checkbox[data-tarea-id="${id}"]`);
+    if (!checkbox) {
+      console.warn('No se encontró el checkbox de la tarea en el DOM');
+      return;
+    }
+    // En tareas la estructura es un div.flex que contiene todo
+    const row = checkbox.closest('.flex.items-center.gap-4');
+    if (row) {
+      row.remove();
+      return;
+    }
+    // fallback para estructura antigua con cards
+    const card = checkbox.closest('.card');
+    if (card) card.remove();
+  }
+}
+
+// ============================================================================
+// SECCIÓN 2: INICIALIZACIÓN DEL CALENDARIO (FullCalendar)
+// ============================================================================
+// Configuración y renderizado del calendario interactivo con drag & drop,
+// resize de eventos, y navegación entre vistas (mes/semana/día)
+
 document.addEventListener('DOMContentLoaded', function () {
   const calendarEl = document.getElementById('calendar');
   if (!calendarEl) return;
 
+  // ================= FULLCALENDAR RESET BÁSICO =================
+  // Configuración mínima y clara: muestra todos los eventos, permite moverlos
+  // entre días y abre el modal de detalle al hacer click.
   const calendar = new FullCalendar.Calendar(calendarEl, {
-    themeSystem: 'bootstrap5',
-    bootstrapFontAwesome: {
-      prev: 'fa-solid fa-chevron-left',
-      next: 'fa-solid fa-chevron-right',
-      today: 'fa-solid fa-calendar-day'
-    },
-    buttonIcons: false,
-    headerToolbar: { 
-      left: 'prev,next today', 
-      center: 'title', 
-      right: 'dayGridMonth,timeGridWeek,timeGridDay' 
-    },
-    height: 850,
-    buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' },
+    locale: 'es',
     initialView: 'dayGridMonth',
     firstDay: 1,
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    height: 760,
+    editable: true,          // permite drag & drop
     selectable: true,
-    selectMirror: true,
-    editable: true,              // permite drag & resize
-    eventResizableFromStart: true,
-    dragScroll: true,
-    timeZone: 'Europe/Madrid',
-    locale: 'es',
-    defaultTimedEventDuration: '00:00:10',
+    events: '/api/eventos',  // ahora devuelve TODOS los eventos
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-    events: '/api/eventos',
-    
-    // Click en un día para evento rápido (mantengo tu lógica)
+
+    // Crear nuevo evento al hacer click en un día vacío -> modal rápido
     dateClick: function(info) {
-      const params = new URLSearchParams();
-      params.set('fecha_evento', info.dateStr);
-      window.location.href = `/eventos/nuevo?${params.toString()}`;
+      abrirModalCreacionRapida(info.dateStr);
     },
 
-    // Click en un evento existente
-      eventClick: function(info) {
-        if (!confirm(`¿Abrir detalles del evento "${info.event.title}"?`)) return;
-        // create a temporary button that our delegated click handler will catch
-        const tmp = document.createElement('button');
-        tmp.style.display = 'none';
-        tmp.className = 'btn-view-event';
-        tmp.setAttribute('data-id', info.event.id);
-        tmp.setAttribute('data-type', 'evento');
-        // open directly in view mode; if you want edit mode by default, set data-action="edit"
-        document.body.appendChild(tmp);
-        tmp.click();
-        tmp.remove();
-      },
+    // Abrir modal de evento directamente al hacer click
+    eventClick: function(info) {
+      const tmp = document.createElement('button');
+      tmp.style.display = 'none';
+      tmp.className = 'btn-view-event';
+      tmp.setAttribute('data-id', info.event.id);
+      tmp.setAttribute('data-type', 'evento');
+      document.body.appendChild(tmp);
+      tmp.click();
+      tmp.remove();
+    },
 
-    // Arrastrar evento a otro día/hora
+    // Drag & drop: mover a otro día (o semana/día). Persistir sin confirmación.
     eventDrop: function(info) {
-      if (!confirm('¿Guardar nueva fecha/hora del evento?')) {
-        info.revert();
-        return;
-      }
-      actualizarEventoDesdeCalendario(info, /*esResize*/ false);
+      actualizarEventoDesdeCalendario(info, false);
     },
 
-    // Redimensionar evento (cambiar fin)
+    // Resize opcional (si se usan rangos de tiempo). Se mantiene para coherencia.
     eventResize: function(info) {
-      if (!confirm('¿Guardar nueva duración del evento?')) {
-        info.revert();
-        return;
-      }
-      actualizarEventoDesdeCalendario(info, /*esResize*/ true);
-    },
-
-    // Mostrar tooltip simple al pasar (opcional)
-    eventMouseEnter: function(info) {
-      const el = info.el;
-      const e = info.event;
-      const start = e.startStr.replace('T', ' ');
-      const end = e.end ? e.endStr.replace('T', ' ') : '';
-      el.setAttribute('title', end ? `${e.title}\nInicio: ${start}\nFin: ${end}` : `${e.title}\nInicio: ${start}`);
+      actualizarEventoDesdeCalendario(info, true);
     }
   });
 
   calendar.render();
+  // Exponer para otros handlers (edición) y refetch
+  window.calendar = calendar;
 
-  // Función auxiliar para formatear fechas/hora
+  // ============== MODAL CREACIÓN RÁPIDA ==============
+  function abrirModalCreacionRapida(fechaStr) {
+    // Evitar abrir múltiples modales
+    if (document.getElementById('quick-event-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'quick-event-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.45)';
+    overlay.style.zIndex = '1060';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    const modal = document.createElement('div');
+    modal.style.background = '#fff';
+    modal.style.width = '100%';
+    modal.style.maxWidth = '420px';
+    modal.style.borderRadius = '10px';
+    modal.style.padding = '18px 20px 20px';
+    modal.style.boxShadow = '0 8px 28px rgba(0,0,0,0.25)';
+    modal.innerHTML = `
+      <h5 style="margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;">Nuevo evento rápido <button type="button" id="quick-close" class="btn btn-sm btn-outline-secondary">✕</button></h5>
+      <form id="quick-event-form">
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Nombre *</label>
+          <input name="nombre" type="text" class="form-control" maxlength="100" required />
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Descripción</label>
+          <textarea name="descripcion" rows="2" class="form-control" maxlength="500" placeholder="Opcional"></textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Fecha inicio *</label>
+          <input name="fecha_evento" type="date" class="form-control" value="${fechaStr}" required />
+        </div>
+        <div class="mb-2" style="display:flex;gap:8px;">
+          <div style="flex:1;">
+            <label class="form-label" style="font-weight:600;">Hora inicio</label>
+            <input name="hora_evento" type="time" class="form-control" />
+          </div>
+          <div style="flex:1;">
+            <label class="form-label" style="font-weight:600;">Hora fin</label>
+            <input name="hora_fin" type="time" class="form-control" />
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-weight:600;">Fecha fin</label>
+          <input name="fecha_fin" type="date" class="form-control" />
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+          <button type="button" id="quick-cancel" class="btn btn-light">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Crear</button>
+        </div>
+        <div id="quick-error" class="text-danger small mt-2" style="display:none;"></div>
+      </form>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Cerrar
+    const cerrar = () => overlay.remove();
+    modal.querySelector('#quick-close').addEventListener('click', cerrar);
+    modal.querySelector('#quick-cancel').addEventListener('click', cerrar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
+
+    // Submit
+    const form = modal.querySelector('#quick-event-form');
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      const fd = new FormData(form);
+      const nombre = (fd.get('nombre') || '').trim();
+      if (!nombre) {
+        mostrarError('El nombre es obligatorio');
+        return;
+      }
+      if (nombre.length < 3) { mostrarError('Nombre mínimo 3 caracteres'); return; }
+      const fecha_evento = fd.get('fecha_evento');
+      const hora_evento = fd.get('hora_evento') || '00:00';
+      const fecha_fin = fd.get('fecha_fin') || null;
+      const hora_fin = fd.get('hora_fin') || null;
+      const descripcion = (fd.get('descripcion') || '').trim();
+
+      // Validación simple hora fin > inicio si ambas
+      if (hora_evento && hora_fin) {
+        if (hora_fin <= hora_evento) { mostrarError('Hora fin debe ser posterior'); return; }
+      }
+      // Validación simple fecha fin >= inicio
+      if (fecha_fin && fecha_fin < fecha_evento) { mostrarError('Fecha fin debe ser posterior'); return; }
+
+      const payload = { nombre, fecha_evento, hora_evento, fecha_fin: fecha_fin || null, hora_fin: hora_fin || null, descripcion };
+      fetch('/api/eventos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+      .then(res => {
+        if (!res.ok) { mostrarError(res.body.error || 'Error creando evento'); return; }
+        // Añadir evento inmediatamente (optimista) usando datos devueltos
+        try { if (window.calendar) { window.calendar.addEvent(res.body); } } catch(_) {}
+        showToast('Evento creado', 'success');
+        cerrar();
+        // Refetch para asegurar coherencia (IDs, etc.)
+        if (window.calendar) window.calendar.refetchEvents();
+      })
+      .catch(err => { console.error(err); mostrarError('Error de red creando evento'); });
+    });
+
+    function mostrarError(msg){
+      const box = modal.querySelector('#quick-error');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+  }
+
+  // --- FUNCIÓN AUXILIAR: Formatear fecha/hora ---
+  // Convierte un objeto Date en formato separado para fecha y hora
   function splitDateTime(dateObj) {
     // dateObj es Date
     const yyyy = dateObj.getFullYear();
@@ -97,94 +440,13 @@ document.addEventListener('DOMContentLoaded', function () {
     };
   }
 
-  // Helper: show a temporary toast in corner
-  function showToast(message, type) {
-    const colors = { success: '#16a34a', error: '#dc2626', info: '#0ea5e9' };
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.position = 'fixed';
-    toast.style.right = '16px';
-    toast.style.top = '16px';
-    toast.style.background = colors[type] || '#333';
-    toast.style.color = '#fff';
-    toast.style.padding = '8px 12px';
-    toast.style.borderRadius = '6px';
-    toast.style.boxShadow = '0 6px 18px rgba(0,0,0,0.12)';
-    toast.style.zIndex = 9999;
-    document.body.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 300ms'; }, 1400);
-    setTimeout(() => toast.remove(), 2000);
-  }
-
-  // Helper: update an event or task on the current page without reload
-  function updateItemInDOM(type, id, payload) {
-    if (type === 'evento') {
-      const btn = document.querySelector(`.btn-view-event[data-id="${id}"]`);
-      if (!btn) return;
-      const card = btn.closest('[class*="p-4"]') || btn.closest('div');
-      if (!card) return;
-      const title = card.querySelector('p.text-text-light') || card.querySelector('p');
-      if (title) title.textContent = payload.nombre || title.textContent;
-      const fecha = card.querySelector('p.text-gray-500');
-      const ps = card.querySelectorAll('p.text-gray-500');
-      if (ps && ps.length >= 2) {
-        ps[0].childNodes && (ps[0].childNodes[ps[0].childNodes.length-1].textContent = ' ' + (payload.fecha_evento || ''));
-        ps[1].childNodes && (ps[1].childNodes[ps[1].childNodes.length-1].textContent = ' ' + (payload.hora_evento ? payload.hora_evento.slice(0,5) : ''));
-      }
-      return true;
-    }
-
-    if (type === 'tarea') {
-      // Try to locate the card: prefer the checkbox, otherwise the view/edit button
-      let anchor = document.querySelector(`.tarea-checkbox[data-tarea-id="${id}"]`);
-      if (!anchor) anchor = document.querySelector(`.btn-view-task[data-id="${id}"]`);
-      if (!anchor) anchor = document.querySelector(`[data-id="${id}"]`);
-      if (!anchor) return;
-      // find nearest card-like container
-      let card = anchor.closest('.card');
-      if (!card) {
-        // fallback: maybe different structure, climb to a parent with class containing 'tarea' or a common container
-        card = anchor.closest('[class*="tarea"]') || anchor.closest('div');
-      }
-      if (!card) return;
-
-      // title and description: try common selectors then fallbacks
-      const title = card.querySelector('.card-title') || card.querySelector('h6') || card.querySelector('h5') || card.querySelector('p');
-      const desc = card.querySelector('.card-text') || card.querySelector('p.card-text') || card.querySelector('p.text-secondary');
-      const fechaSpan = card.querySelector('span.text-secondary');
-      const prioridadBadge = card.querySelector('span.badge');
-
-      if (title && payload.nombre) title.textContent = payload.nombre;
-      if (desc) desc.textContent = payload.descripcion || '';
-      if (fechaSpan) fechaSpan.textContent = payload.fecha_evento || '';
-      if (prioridadBadge && payload.prioridad) {
-        const p = parseInt(payload.prioridad, 10);
-        prioridadBadge.textContent = p === 1 ? 'Baja' : (p === 2 ? 'Media' : 'Alta');
-      }
-      return true;
-    }
-
-    return false;
-  }
-
-  // Helper: remove element from DOM after delete
-  function removeItemFromDOM(type, id) {
-    if (type === 'evento') {
-      const btn = document.querySelector(`.btn-view-event[data-id="${id}"]`);
-      if (!btn) return;
-      // remove outer p-4 container if present
-      const container = btn.closest('.p-4') || btn.closest('[class*="p-4"]') || btn.closest('div');
-      if (container) container.remove();
-      return;
-    }
-    if (type === 'tarea') {
-      const checkbox = document.querySelector(`.tarea-checkbox[data-tarea-id="${id}"]`);
-      if (!checkbox) return;
-      const card = checkbox.closest('.card');
-      if (card) card.remove();
-    }
-  }
-
+  /**
+   * Actualiza un evento en el servidor después de drag/drop o resize
+   * Valida fechas y envía PUT request al backend
+   * 
+   * @param {Object} info - Información del evento de FullCalendar
+   * @param {boolean} esResize - true si es un resize, false si es drag
+   */
   function actualizarEventoDesdeCalendario(info, esResize) {
     const event = info.event;
 
@@ -193,12 +455,12 @@ document.addEventListener('DOMContentLoaded', function () {
     if (event.end) {
       endParts = splitDateTime(event.end);
     } else if (esResize) {
-      // si se intenta resize pero no hay end previo, calculamos algo por defecto
+      // Si se intenta resize pero no hay fecha fin previa, calcular una por defecto (30 min)
       const fallbackEnd = new Date(event.start.getTime() + 30 * 60 * 1000);
       endParts = splitDateTime(fallbackEnd);
     }
 
-    // Validación simple: si hay end y es anterior al start -> revert
+    // Validación: la fecha/hora de fin no puede ser anterior o igual al inicio
     if (endParts) {
       const startDate = new Date(`${startParts.fecha}T${startParts.hora}`);
       const endDate = new Date(`${endParts.fecha}T${endParts.hora}`);
@@ -209,16 +471,20 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // Payload para tu endpoint PUT
+    // Construir payload para enviar al endpoint PUT /api/eventos/:id
+    // Conservar descripción original si existe en extendedProps
+    const descripcionOriginal = event.extendedProps && event.extendedProps.descripcion ? event.extendedProps.descripcion : null;
     const payload = {
       nombre: event.title,
       fecha_evento: startParts.fecha,
       hora_evento: startParts.hora,
       fecha_fin: endParts ? endParts.fecha : null,
-      hora_fin: endParts ? endParts.hora : null
+      hora_fin: endParts ? endParts.hora : null,
+      ...(descripcionOriginal ? { descripcion: descripcionOriginal } : {})
     };
 
-    fetch(`/api/eventos/${event.id}`, {
+    // Enviar actualización al servidor
+  fetch(`/api/eventos/${event.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -228,24 +494,32 @@ document.addEventListener('DOMContentLoaded', function () {
       return r.json();
     })
     .then(data => {
-      // Opcional: mostrar notificación
+      // Evento actualizado correctamente (opcional: mostrar notificación)
       // console.log('Evento actualizado', data);
     })
     .catch(err => {
       console.error(err);
       alert('No se pudo actualizar el evento. Se revierte el cambio.');
-      info.revert();
+      info.revert(); // Revertir cambios visuales si falla el servidor
     });
   }
 });
+
+// ============================================================================
+// SECCIÓN 3: BÚSQUEDA EN VIVO (Live Search)
+// ============================================================================
+// Filtrado en tiempo real de tareas y eventos según el texto de búsqueda
+// Utiliza debounce para optimizar rendimiento
+
 document.addEventListener('DOMContentLoaded', function() {
-  // Live search helpers for Tareas and Eventos (debounced)
+  // Función debounce para evitar ejecuciones excesivas durante escritura rápida
   const debounce = (fn, ms = 150) => {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   };
 
-  // Tareas: filter rows inside #tareas-list
+  // --- BÚSQUEDA EN TAREAS ---
+  // Filtra las filas dentro de #tareas-list según el texto ingresado
   const searchTareasInput = document.getElementById('search-tareas');
   if (searchTareasInput) {
     const tareasList = document.getElementById('tareas-list');
@@ -261,7 +535,8 @@ document.addEventListener('DOMContentLoaded', function() {
     searchTareasInput.addEventListener('input', debounce(filterTareas, 150));
   }
 
-  // Eventos: filter cards inside #eventos-grid
+  // --- BÚSQUEDA EN EVENTOS ---
+  // Filtra las tarjetas dentro de #eventos-grid según el texto ingresado
   const searchEventosInput = document.getElementById('search-eventos');
   if (searchEventosInput) {
     const eventosGrid = document.getElementById('eventos-grid');
@@ -277,99 +552,157 @@ document.addEventListener('DOMContentLoaded', function() {
     searchEventosInput.addEventListener('input', debounce(filterEventos, 150));
   }
 
+  // ============================================================================
+  // SECCIÓN 4: GESTIÓN DE CHECKBOXES DE TAREAS
+  // ============================================================================
+  // Maneja el cambio de estado de tareas (completada/pendiente)
+  // Implementa "optimistic updates" para feedback instantáneo
+  // Funciona tanto en tareas.html como en dashboard.html
+
   document.querySelectorAll('.tarea-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const tareaId = this.getAttribute('data-tarea-id');
-            const completada = this.checked;
-            const estado = completada ? 1 : 0;
-            
-            fetch(`/tareas/${tareaId}/estado`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ estado: estado })
-                })
-                .then(response => response.json())
-                .then(data => {
-                  if (!data.success) throw new Error(data.error || 'Error desconocido');
+    checkbox.addEventListener('change', function() {
+      const tareaId = this.getAttribute('data-tarea-id');
+      const completada = this.checked;
+      const estado = completada ? 1 : 0;
+      
+      // Buscar el contenedor de la tarea (tareas.html usa gap-4, dashboard.html usa gap-3)
+      const tareaRow = this.closest('.flex.items-center.gap-4') || this.closest('.flex.items-center.gap-3');
+      
+      // Actualizar estilos INMEDIATAMENTE antes de enviar al servidor (optimistic update)
+      // Esto proporciona feedback instantáneo al usuario
+      if (tareaRow) {
+        // Actualizar título (h3 en tareas.html o p en dashboard.html)
+        const title = tareaRow.querySelector('h3.text-lg') || tareaRow.querySelector('p');
+        if (title) {
+          if (completada) {
+            title.classList.add('line-through', 'text-gray-500');
+            title.classList.remove('text-gray-900', 'text-gray-800');
+          } else {
+            title.classList.remove('line-through', 'text-gray-500');
+            // Restaurar color original (gray-900 en tareas.html, gray-800 en dashboard)
+            if (!title.classList.contains('text-gray-900') && !title.classList.contains('text-gray-800')) {
+              title.classList.add('text-gray-800');
+            }
+          }
+        }
+        
+        // Actualizar descripción (solo presente en tareas.html, no en dashboard)
+        const desc = tareaRow.querySelector('p.text-gray-500.text-sm.mt-1');
+        if (desc) {
+          if (completada) {
+            desc.classList.add('line-through');
+          } else {
+            desc.classList.remove('line-through');
+          }
+        }
+        
+        // Actualizar badge de estado (solo presente en tareas.html, no en dashboard)
+        const estadoBadges = tareaRow.querySelectorAll('span.inline-flex.items-center.px-2\\.5');
+        const estadoBadge = Array.from(estadoBadges).find(badge => 
+          badge.textContent.includes('Completada') || badge.textContent.includes('Pendiente')
+        );
+        if (estadoBadge) {
+          estadoBadge.textContent = completada ? 'Completada' : 'Pendiente';
+          if (completada) {
+            estadoBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+          } else {
+            estadoBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800';
+          }
+        }
+      }
+      
+      // Enviar actualización al servidor
+      fetch(`/tareas/${tareaId}/estado`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ estado: estado })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (!data.success) throw new Error(data.error || 'Error desconocido');
 
-                  // Actualizar el estilo del texto de la tarea
-                  const tareaTexto = this.nextElementSibling;
-                  if (tareaTexto) {
-                      if (completada) {
-                          tareaTexto.classList.add('text-gray-500', 'line-through');
-                          tareaTexto.classList.remove('text-gray-800');
-                      } else {
-                          tareaTexto.classList.remove('text-gray-500', 'line-through');
-                          tareaTexto.classList.add('text-gray-800');
-                      }
-                  }
-
-                  // 🔹 Modo 1: card grande (para vista de tareas)
-                  const card = this.closest('.card');
-                  if (card) {
-                    const estadoBadge = card.querySelector('.estado-badge');
-                    const title = card.querySelector('.card-title');
-                    const desc = card.querySelector('.card-text');
-
-                    if (estadoBadge) {
-                      estadoBadge.textContent = completada ? 'Completada' : 'Pendiente';
-                      estadoBadge.classList.toggle('bg-success', completada);
-                      estadoBadge.classList.toggle('bg-secondary', !completada);
-                    }
-
-                    if (title) title.classList.toggle('text-decoration-line-through', completada);
-                    if (title) title.classList.toggle('text-muted', completada);
-                    if (desc) desc.classList.toggle('text-decoration-line-through', completada);
-                  }
-
-                  // 🔹 Actualizar contador de tareas completadas
-                  const contador = document.getElementById('contador-tareas');
-                  if (contador) {
-                      // Parseamos los valores actuales
-                      let [actualCompletadas, total] = contador.textContent.split('/').map(Number);
-                      if (completada) {
-                          actualCompletadas += 1;
-                      } else {
-                          actualCompletadas -= 1;
-                      }
-                      contador.textContent = `${actualCompletadas}/${total}`;
-                  }
-                })
-            .catch(err => {
-              console.error(err);
-              alert('No se pudo cargar la vista del evento');
-            });
-        });
-
-            // Ensure create buttons navigate to the form even if something else intercepts clicks
-            document.addEventListener('click', function(e) {
-              const a = e.target.closest && e.target.closest('a[href]');
-              if (!a) return;
-              const href = a.getAttribute('href') || '';
-              if (href.includes('/eventos/nuevo') || href.includes('/tareas/nueva')) {
-                e.preventDefault();
-                // force navigation
-                window.location.href = href;
-              }
-            });
-
+        // Actualizar contador de tareas completadas (si existe)
+        const contador = document.getElementById('contador-tareas');
+        if (contador) {
+          let [actualCompletadas, total] = contador.textContent.split('/').map(Number);
+          if (completada) {
+            actualCompletadas += 1;
+          } else {
+            actualCompletadas -= 1;
+          }
+          contador.textContent = `${actualCompletadas}/${total}`;
+        }
+        
+        // Mostrar confirmación breve
+        showToast(completada ? 'Tarea completada' : 'Tarea reactivada', 'success');
+      })
+      .catch(err => {
+        console.error(err);
+        // --- REVERSIÓN DE CAMBIOS ---
+        // Si el servidor falla, revertir todos los cambios visuales
+        this.checked = !completada;
+        if (tareaRow) {
+          const title = tareaRow.querySelector('h3.text-lg');
+          const desc = tareaRow.querySelector('p.text-gray-500.text-sm');
+          const estadoBadges = tareaRow.querySelectorAll('span.inline-flex.items-center.px-2\\.5');
+          const estadoBadge = Array.from(estadoBadges).find(badge => 
+            badge.textContent.includes('Completada') || badge.textContent.includes('Pendiente')
+          );
+          
+          if (title) {
+            if (!completada) {
+              title.classList.add('line-through', 'text-gray-500');
+              title.classList.remove('text-gray-900');
+            } else {
+              title.classList.remove('line-through', 'text-gray-500');
+              title.classList.add('text-gray-900');
+            }
+          }
+          
+          if (desc) {
+            if (!completada) {
+              desc.classList.add('line-through');
+            } else {
+              desc.classList.remove('line-through');
+            }
+          }
+          
+          if (estadoBadge) {
+            estadoBadge.textContent = !completada ? 'Completada' : 'Pendiente';
+            if (!completada) {
+              estadoBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+            } else {
+              estadoBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800';
+            }
+          }
+        }
+        showToast('Error al actualizar el estado de la tarea', 'error');
+      });
+    });
+  });
 });
 
-// ------------------------
-// Modal: Ver / Editar / Eliminar evento
-// ------------------------
+// ============================================================================
+// SECCIÓN 5: SISTEMA DE MODALES (Ver / Editar / Eliminar)
+// ============================================================================
+// Gestiona la apertura y funcionalidad de modales para eventos y tareas
+// Utiliza event delegation para capturar clicks en botones dinámicos
+// Soporta modo visualización y edición con validación de datos
+
+// Event listener delegado a nivel de documento para capturar clicks en botones de ver/editar
 document.addEventListener('click', function (e) {
-  // abrir modal desde botones con clase .btn-view-event, .link-view-event, .btn-view-task
+  // Buscar si el click fue en un botón de ver evento/tarea
   const target = e.target.closest && e.target.closest('.btn-view-event, .link-view-event, .btn-view-task');
   if (!target) return;
   e.preventDefault();
   const id = target.getAttribute('data-id');
-  // determine type (evento/tarea)
+  // Determinar el tipo (evento/tarea) según atributo o clase del botón
   const type = target.getAttribute('data-type') || (target.classList.contains('btn-view-task') ? 'tarea' : 'evento');
   if (!id) return;
 
+  // Construir la ruta del endpoint para obtener el fragmento HTML del modal
   const basePath = type === 'tarea' ? 'tareas' : 'eventos';
   fetch(`/${basePath}/${id}/ver`)
     .then(r => {
@@ -377,15 +710,16 @@ document.addEventListener('click', function (e) {
       return r.text();
     })
     .then(html => {
-      // insertar fragmento y enlazar handlers
+      // Insertar el fragmento HTML del modal en el documento
       const wrapper = document.createElement('div');
       wrapper.innerHTML = html;
       document.body.appendChild(wrapper);
 
-      // support both ids used previously
+      // Obtener referencias a los elementos del modal (soporta ambos IDs por compatibilidad)
       const overlay = document.getElementById('item-modal-overlay') || document.getElementById('evento-modal-overlay');
       if (!overlay) return;
 
+      // Obtener referencias a los botones y formulario del modal
   const closeBtn = overlay.querySelector('#modal-close');
       const editBtn = overlay.querySelector('#modal-edit');
       const saveBtn = overlay.querySelector('#modal-save');
@@ -393,34 +727,38 @@ document.addEventListener('click', function (e) {
       const deleteBtn = overlay.querySelector('#modal-delete');
       const form = overlay.querySelector('#modal-form');
 
-      // save original values so we can restore on cancel
+      // Guardar valores originales del formulario para restaurar en caso de cancelar
       const originalValues = {};
-      // store original values for inputs, textareas and selects
+      // Almacenar valores originales de inputs, textareas y selects
       Array.from(form.querySelectorAll('input, textarea, select')).forEach(i => {
         originalValues[i.name] = i.value;
       });
 
+      // --- FUNCIÓN: Cerrar modal ---
       function closeModal() {
-        // remove wrapper (which contains overlay)
+        // Eliminar el wrapper (que contiene el overlay y todo el modal)
         wrapper.remove();
       }
 
+      // Event listeners para cerrar el modal
       closeBtn && closeBtn.addEventListener('click', closeModal);
       overlay.addEventListener('click', (ev) => {
-        if (ev.target === overlay) closeModal();
+        if (ev.target === overlay) closeModal(); // Cerrar al hacer click fuera del modal
       });
 
-      // Edit: enable inputs/selects and switch buttons (use inline styles for compatibility)
+      // --- BOTÓN EDITAR: Activar modo edición ---
+      // Habilita inputs/selects y cambia botones visibles
       editBtn && editBtn.addEventListener('click', () => {
         Array.from(form.querySelectorAll('input, textarea')).forEach(i => i.removeAttribute('readonly'));
         Array.from(form.querySelectorAll('select')).forEach(s => s.removeAttribute('disabled'));
-        // show/hide buttons
+        // Mostrar/ocultar botones (usar estilos inline para compatibilidad)
         editBtn.style.display = 'none';
         saveBtn.style.display = '';
         cancelBtn.style.display = '';
       });
 
-      // Cancel: restore original values and set readonly/disabled
+      // --- BOTÓN CANCELAR: Restaurar valores originales ---
+      // Revierte cambios no guardados y vuelve a modo visualización
       cancelBtn && cancelBtn.addEventListener('click', () => {
         Array.from(form.querySelectorAll('input, textarea, select')).forEach(i => {
           if (Object.prototype.hasOwnProperty.call(originalValues, i.name)) {
@@ -432,13 +770,14 @@ document.addEventListener('click', function (e) {
             i.setAttribute('readonly', '');
           }
         });
-        // show/hide buttons
+        // Mostrar/ocultar botones
         saveBtn.style.display = 'none';
         cancelBtn.style.display = 'none';
         editBtn.style.display = '';
       });
 
-      // Save: send PUT and refresh
+      // --- BOTÓN GUARDAR: Enviar cambios al servidor ---
+      // Construye payload y envía PUT request, actualiza DOM si éxito
       saveBtn && saveBtn.addEventListener('click', () => {
         const formData = new FormData(form);
         const payload = {
@@ -451,12 +790,12 @@ document.addEventListener('click', function (e) {
         };
 
         if (type === 'tarea') {
-          // add task-specific fields
+          // Añadir campos específicos de tareas
           payload.prioridad = formData.get('prioridad') || '1';
           payload.estado = formData.get('estado') || '0';
         }
 
-        // Choose endpoint depending on item type
+        // Elegir endpoint según el tipo de item
         const saveUrl = type === 'tarea' ? `/api/tareas/${id}` : `/api/eventos/${id}`;
         fetch(saveUrl, {
           method: 'PUT',
@@ -468,10 +807,11 @@ document.addEventListener('click', function (e) {
           return r.json();
         })
         .then((data) => {
-          // use server-returned object to update DOM (server-authoritative)
+          // Usar el objeto devuelto por el servidor para actualizar el DOM (server-authoritative)
           try {
             let normalized = {};
             if (type === 'evento') {
+              // Normalizar datos de evento desde la respuesta del servidor
               normalized.nombre = data.Nombre || data.nombre || payload.nombre;
               normalized.descripcion = data.Descripcion || data.descripcion || payload.descripcion || '';
               normalized.fecha_evento = data.Fecha_evento || data.fecha_evento || payload.fecha_evento || '';
@@ -479,7 +819,7 @@ document.addEventListener('click', function (e) {
               normalized.fecha_fin = data.Fecha_fin || data.fecha_fin || payload.fecha_fin || null;
               normalized.hora_fin = (data.Hora_fin || data.hora_fin || payload.hora_fin || '').toString().slice(0,5);
             } else {
-              // tarea
+              // Normalizar datos de tarea desde la respuesta del servidor
               normalized.nombre = data.Nombre || data.nombre || payload.nombre;
               normalized.descripcion = data.Descripcion || data.descripcion || payload.descripcion || '';
               normalized.fecha_evento = data.Fecha_limite || data.Fecha_evento || data.fecha_evento || payload.fecha_evento || '';
@@ -489,7 +829,7 @@ document.addEventListener('click', function (e) {
             }
             const updated = updateItemInDOM(type, id, normalized);
             if (!updated) {
-              // fallback: if we couldn't find the card to update, reload to reflect changes
+              // Fallback: si no se pudo actualizar el DOM, recargar página para reflejar cambios
               showToast('Guardado. Recargando para actualizar la vista...', 'info');
               closeModal();
               location.reload();
@@ -507,7 +847,7 @@ document.addEventListener('click', function (e) {
         });
       });
 
-      // Delete: POST delete route
+      // --- BOTÓN ELIMINAR: Borrar elemento del servidor y DOM ---
       deleteBtn && deleteBtn.addEventListener('click', () => {
         if (!confirm('¿Eliminar este elemento? Esta acción no se puede deshacer.')) return;
         const basePath = type === 'tarea' ? 'tareas' : 'eventos';
@@ -524,11 +864,15 @@ document.addEventListener('click', function (e) {
                 console.warn('No se pudo eliminar elemento del DOM', e);
               }
               closeModal();
+              // Refrescar eventos del calendario si se editó un evento
+              if (type === 'evento' && window.calendar) {
+                try { window.calendar.refetchEvents(); } catch(e) { console.warn('Refetch falló', e); }
+              }
             })
             .catch(err => { console.error(err); alert('Error al eliminar el elemento'); });
       });
 
-      // If the trigger requested to open in edit mode, activate edit immediately
+      // Si el botón disparador solicitó abrir en modo edición, activar edición inmediatamente
       if (target.getAttribute && target.getAttribute('data-action') === 'edit') {
         editBtn && editBtn.click();
       }
@@ -538,5 +882,4 @@ document.addEventListener('click', function (e) {
       console.error(err);
       alert('No se pudo cargar la vista del evento');
     });
-})
 });

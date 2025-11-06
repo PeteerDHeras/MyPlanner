@@ -6,6 +6,12 @@
   <div class="card p-4 shadow-sm" style="max-width: 400px; width: 100%;">
     <h2 class="mb-4 text-center">Crear nuevo evento</h2>
 
+    {% if error %}
+    <div class="alert alert-danger py-2 px-3 mb-3" role="alert">
+      {{ error }}
+    </div>
+    {% endif %}
+
     <form method="POST" class="needs-validation mt-4" novalidate>
       <!-- Nombre del evento -->
       <div class="mb-3">
@@ -14,6 +20,12 @@
         <div class="invalid-feedback">
           Por favor ingresa el nombre del evento.
         </div>
+      </div>
+
+      <!-- Descripción del evento -->
+      <div class="mb-3">
+        <label for="descripcion" class="form-label">Descripción (opcional)</label>
+        <textarea id="descripcion" name="descripcion" class="form-control form-control-sm" rows="3"></textarea>
       </div>
 
       <!-- Fecha de inicio -->
@@ -35,7 +47,7 @@
                 value="{{ request.args.get('hora_evento', '') }}" required>
         <div class="invalid-feedback">
           Por favor selecciona la hora del evento.
-        </div>
+        </div>©
       </div>
 
       <!-- Fecha de finalización (opcional) -->

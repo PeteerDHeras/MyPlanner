@@ -1,92 +1,278 @@
 from datetime import datetime, timedelta
 import mysql.connector
 import bcrypt
+import re
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
+
+# ----------- FUNCIONES DE VALIDACIÓN Y SEGURIDAD -------------------
+
+def validar_input_texto(texto, max_length=100, allow_blank=False):
+    """Validador simplificado.
+
+    Se basa en:
+    - Tipo string
+    - Longitud máxima
+    - Opcional permitir vacío
+    - No intenta reconocer patrones SQL (porque usamos consultas parametrizadas).
+
+    Esto reduce falsos positivos y hace más sencillo el flujo.
+    """
+    if texto is None:
+        return allow_blank
+    if not isinstance(texto, str):
+        return False
+    if not texto.strip():
+        return allow_blank
+    if len(texto) > max_length:
+        return False
+    return True
+
+
+def validar_usuario_password(usuario, password):
+    """Valida usuario y contraseña de forma básica.
+
+    - Usuario: obligatorio, <=50, caracteres permitidos alfanumérico + _ - @ .
+    - Password: obligatorio, <=100. (La complejidad se comprueba en app.py para registro.)
+    """
+    if not isinstance(usuario, str) or not isinstance(password, str):
+        return False
+    if not usuario or not password:
+        return False
+    if len(usuario) > 50 or len(password) > 100:
+        return False
+    if not re.match(r'^[a-zA-Z0-9_\-@.]+$', usuario):
+        return False
+    # No chequeamos SQL keywords porque usamos consultas parametrizadas.
+    return True
 
 
 # Conexión a la base de datos
 
 def get_connection():
-    return mysql.connector.connect(
-        host="192.168.0.120",                   # TODO: Cambiar de localhost a "myplanner.com" para simulación producción
-        user="pdelasheras",                     # TODO: Hacer que esta información viaje en ssl (Apache)
-        password="pdelasheras",
-        database="myplanner_db"
-    )
+    """
+    Crea una conexión segura a la base de datos MySQL.
+    Usa variables de entorno para las credenciales.
+    Compatible con Aiven MySQL con SSL/TLS.
+    """
+    # Obtener credenciales de variables de entorno
+    db_host = os.getenv('DB_HOST', 'localhost')
+    db_port = int(os.getenv('DB_PORT', 3306))
+    db_user = os.getenv('DB_USER', 'pdelasheras')
+    db_password = os.getenv('DB_PASSWORD', 'pdelasheras')
+    db_name = os.getenv('DB_NAME', 'myplanner_db')
+    
+    # Configurar conexión con o sin SSL según el host
+    connection_config = {
+        'host': db_host,
+        'port': db_port,
+        'user': db_user,
+        'password': db_password,
+        'database': db_name,
+        'autocommit': False,
+        'connection_timeout': 10
+    }
+    
+    # Si es Aiven (contiene aivencloud.com), habilitar SSL
+    if 'aivencloud.com' in db_host:
+        db_ssl_ca = os.getenv('DB_SSL_CA')
+        
+        if db_ssl_ca:
+            # Si hay certificado en variable de entorno, guardarlo temporalmente
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as cert_file:
+                cert_file.write(db_ssl_ca)
+                cert_path = cert_file.name
+            
+            connection_config['ssl_ca'] = cert_path
+            connection_config['ssl_verify_cert'] = True
+            connection_config['ssl_verify_identity'] = True
+        else:
+            # Sin certificado, usar SSL pero sin verificar identidad
+            connection_config['ssl_verify_cert'] = True
+            connection_config['ssl_verify_identity'] = False
+        
+        connection_config['ssl_disabled'] = False
+    
+    return mysql.connector.connect(**connection_config)
 
 # ----------- FUNCIONES PARA GESTIONAR USUARIOS -------------------
 
 # REGISTRAR USUARIO
 def registrar_usuario(nombre, contraseña, rol_id):
+    # VALIDAR ANTES DE CONECTAR
+    if not validar_usuario_password(nombre, contraseña):
+        raise ValueError("Datos de usuario inválidos o sospechosos")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    hashed = bcrypt.hashpw(contraseña.encode('utf-8'), bcrypt.gensalt())
-    query = "INSERT INTO USUARIO (usuario, password, rol) VALUES (%s, %s, %s)"
-    cursor.execute(query, (nombre, hashed.decode('utf-8'), rol_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        hashed = bcrypt.hashpw(contraseña.encode('utf-8'), bcrypt.gensalt())
+        # Tabla real en el esquema: usuario (minúsculas)
+        query = "INSERT INTO usuario (usuario, password, rol) VALUES (%s, %s, %s)"
+        cursor.execute(query, (nombre, hashed.decode('utf-8'), rol_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # VERIFICAR USUARIO
 def verificar_usuario(nombre, contraseña):
+    # VALIDAR ANTES DE CONECTAR - PROTECCIÓN SQL INJECTION
+    if not validar_usuario_password(nombre, contraseña):
+        return False
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT password FROM USUARIO WHERE usuario=%s", (nombre,))
-    result = cursor.fetchone()
-    conn.close()
-    if result and bcrypt.checkpw(contraseña.encode('utf-8'), result[0].encode('utf-8')):
-        return True
-    return False
+    try:
+        cursor = conn.cursor()
+        # Tabla real: usuario
+        cursor.execute("SELECT password FROM usuario WHERE usuario=%s", (nombre,))
+        result = cursor.fetchone()
+        if not result:
+            return False
+        return bcrypt.checkpw(contraseña.encode('utf-8'), result[0].encode('utf-8'))
+    except Exception:
+        return False
+    finally:
+        conn.close()
 
 # Obtener usuario por nombre
 def obtener_usuario_por_nombre(nombre):
+    # VALIDAR ANTES DE CONECTAR
+    if not nombre or not validar_input_texto(nombre, 50):
+        return None
+    
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT ID FROM USUARIO WHERE usuario = %s", (nombre,))
-    usuario = cursor.fetchone()
-    conn.close()
-    return usuario
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, usuario, rol FROM usuario WHERE usuario = %s", (nombre,))
+        usuario = cursor.fetchone()
+        return usuario
+    except Exception:
+        return None
+    finally:
+        conn.close()
 
 #--------------------- FUNCIONES PARA GESTIONAR EVENTOS ------------------------------
 
 # CREAR EVENTO
-def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, hora_fin=None):
+def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, hora_fin=None, descripcion=None):
+    # VALIDAR DATOS ANTES DE CONECTAR
+    from utils import validar_texto_seguro, validar_fecha_formato, validar_hora_formato, validar_id
+    
+    if not validar_texto_seguro(nombre, 100, required=True):
+        raise ValueError("Nombre de evento inválido")
+    
+    if not validar_fecha_formato(fecha_evento):
+        raise ValueError("Fecha de evento inválida")
+    
+    if not validar_hora_formato(hora_evento):
+        raise ValueError("Hora de evento inválida")
+    
+    if not validar_id(creador_id):
+        raise ValueError("ID de creador inválido")
+    
+    if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
+        raise ValueError("Descripción inválida")
+    
+    if fecha_fin and not validar_fecha_formato(fecha_fin):
+        raise ValueError("Fecha fin inválida")
+    
+    if hora_fin and not validar_hora_formato(hora_fin):
+        raise ValueError("Hora fin inválida")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        INSERT INTO EVENTOS (Nombre, Fecha_creacion, Fecha_evento, Hora_evento, creadorEvento, Fecha_fin, Hora_fin)
-        VALUES (%s, CURDATE(), %s, %s, %s, %s, %s)
-    """
-    cursor.execute(query, (nombre, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        # fecha_creacion ahora es TIMESTAMP con DEFAULT CURRENT_TIMESTAMP
+        query = """
+            INSERT INTO eventos (nombre, descripcion, fecha_evento, hora_evento, creador_evento, fecha_fin, hora_fin)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (nombre, descripcion, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # MODIFICAR EVENTO
-def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=None, hora_fin=None):
+def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=None, hora_fin=None, descripcion=None):
+    # VALIDAR DATOS ANTES DE CONECTAR
+    from utils import validar_texto_seguro, validar_fecha_formato, validar_hora_formato, validar_id
+    
+    if not validar_id(evento_id):
+        raise ValueError("ID de evento inválido")
+    
+    if not validar_texto_seguro(nombre, 100, required=True):
+        raise ValueError("Nombre de evento inválido")
+    
+    if not validar_fecha_formato(fecha_evento):
+        raise ValueError("Fecha de evento inválida")
+    
+    if not validar_hora_formato(hora_evento):
+        raise ValueError("Hora de evento inválida")
+    
+    if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
+        raise ValueError("Descripción inválida")
+    
+    if fecha_fin and not validar_fecha_formato(fecha_fin):
+        raise ValueError("Fecha fin inválida")
+    
+    if hora_fin and not validar_hora_formato(hora_fin):
+        raise ValueError("Hora fin inválida")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        UPDATE EVENTOS
-        SET Nombre=%s, Fecha_evento=%s, Hora_evento=%s, Fecha_fin=%s, Hora_fin=%s
-        WHERE ID=%s
-    """
-    cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, evento_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = """
+            UPDATE eventos
+            SET nombre=%s, fecha_evento=%s, hora_evento=%s, fecha_fin=%s, hora_fin=%s, descripcion=%s
+            WHERE id=%s
+        """
+        cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, descripcion, evento_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 
 # ELIMINAR EVENTO
 def eliminar_evento(evento_id):
+    # VALIDAR ID ANTES DE CONECTAR
+    from utils import validar_id
+    
+    if not validar_id(evento_id):
+        raise ValueError("ID de evento inválido")
+    
     conn = get_connection()
-    # Conexión a la base de datos
-
-    cursor.execute("DELETE FROM EVENTOS WHERE ID=%s", (evento_id,))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM eventos WHERE id=%s", (evento_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # OBTENER EVENTOS
-def obtener_eventos():  
+def obtener_eventos(usuario_id=None):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM EVENTOS ORDER BY Fecha_evento ASC, Hora_evento ASC")
+    if usuario_id:
+        cursor.execute("SELECT * FROM eventos WHERE creador_evento = %s ORDER BY fecha_evento ASC, hora_evento ASC", (usuario_id,))
+    else:
+        cursor.execute("SELECT * FROM eventos ORDER BY fecha_evento ASC, hora_evento ASC")
     eventos = cursor.fetchall()
     conn.close()
     return eventos
@@ -95,55 +281,140 @@ def obtener_eventos():
 
 # Modificar CREAR TAREA para incluir estado
 def crear_tarea(nombre, descripcion, fecha_limite, prioridad, creador_id, estado=0):
+    # VALIDAR DATOS ANTES DE CONECTAR
+    from utils import validar_texto_seguro, validar_fecha_formato, validar_id, validar_prioridad, validar_estado
+    
+    if not validar_texto_seguro(nombre, 100, required=True):
+        raise ValueError("Nombre de tarea inválido")
+    
+    if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
+        raise ValueError("Descripción inválida")
+    
+    if not validar_fecha_formato(fecha_limite):
+        raise ValueError("Fecha límite inválida")
+    
+    if not validar_prioridad(prioridad):
+        raise ValueError("Prioridad inválida (debe ser 1, 2 o 3)")
+    
+    if not validar_id(creador_id):
+        raise ValueError("ID de creador inválido")
+    
+    if not validar_estado(estado):
+        raise ValueError("Estado inválido (debe ser 0 o 1)")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        INSERT INTO TAREAS (Nombre, Descripcion, Fecha_creacion, Fecha_limite, Prioridad, creadorTarea, Estado)
-        VALUES (%s, %s, CURDATE(), %s, %s, %s, %s)
-    """
-    cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id, estado))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        # fecha_creacion ahora es TIMESTAMP con DEFAULT CURRENT_TIMESTAMP
+        query = """
+            INSERT INTO tareas (nombre, descripcion, fecha_limite, prioridad, creador_tarea, estado)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id, estado))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # Modificar MODIFICAR TAREA para incluir estado
 def modificar_tarea(tarea_id, nombre, descripcion, fecha_limite, prioridad, estado):
+    # VALIDAR DATOS ANTES DE CONECTAR
+    from utils import validar_texto_seguro, validar_fecha_formato, validar_id, validar_prioridad, validar_estado
+    
+    if not validar_id(tarea_id):
+        raise ValueError("ID de tarea inválido")
+    
+    if not validar_texto_seguro(nombre, 100, required=True):
+        raise ValueError("Nombre de tarea inválido")
+    
+    if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
+        raise ValueError("Descripción inválida")
+    
+    if not validar_fecha_formato(fecha_limite):
+        raise ValueError("Fecha límite inválida")
+    
+    if not validar_prioridad(prioridad):
+        raise ValueError("Prioridad inválida (debe ser 1, 2 o 3)")
+    
+    if not validar_estado(estado):
+        raise ValueError("Estado inválido (debe ser 0 o 1)")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        UPDATE TAREAS
-        SET Nombre=%s, Descripcion=%s, Fecha_limite=%s, Prioridad=%s, Estado=%s
-        WHERE ID=%s
-    """
-    cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, estado, tarea_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = """
+            UPDATE tareas
+            SET nombre=%s, descripcion=%s, fecha_limite=%s, prioridad=%s, estado=%s
+            WHERE id=%s
+        """
+        cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, estado, tarea_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # ELIMINAR TAREA
 def eliminar_tarea(tarea_id):
+    # VALIDAR ID ANTES DE CONECTAR
+    from utils import validar_id
+    
+    if not validar_id(tarea_id):
+        raise ValueError("ID de tarea inválido")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM TAREAS WHERE ID=%s", (tarea_id,))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tareas WHERE id=%s", (tarea_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 def actualizar_estado_tarea(tarea_id, estado):
+    # VALIDAR DATOS ANTES DE CONECTAR
+    from utils import validar_id, validar_estado
+    
+    if not validar_id(tarea_id):
+        raise ValueError("ID de tarea inválido")
+    
+    if not validar_estado(estado):
+        raise ValueError("Estado inválido (debe ser 0 o 1)")
+    
     conn = get_connection()
-    cursor = conn.cursor()
-    query = "UPDATE TAREAS SET Estado=%s WHERE ID=%s"
-    cursor.execute(query, (estado, tarea_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        query = "UPDATE tareas SET estado=%s WHERE id=%s"
+        cursor.execute(query, (estado, tarea_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # OBTENER TAREAS
-def obtener_tareas():
+def obtener_tareas(usuario_id=None):
     conexion = get_connection()
     with conexion.cursor(dictionary=True) as cursor:
-        cursor.execute("SELECT * FROM tareas")
+        if usuario_id:
+            cursor.execute("SELECT * FROM tareas WHERE creador_tarea = %s", (usuario_id,))
+        else:
+            cursor.execute("SELECT * FROM tareas")
         tareas = cursor.fetchall()
         for t in tareas:
-            estado = int(t.get('Estado') or t.get('estado') or 0)
-            t['Estado'] = estado  # ← Esto es clave para que Jinja lo compare bien
-            t['Estado_str'] = 'Pendiente' if estado == 0 else 'Completada'
+            estado_val = t.get('estado', 0)
+            try:
+                estado_int = int(estado_val)
+            except (TypeError, ValueError):
+                estado_int = 0
+            t['estado'] = estado_int  # asegurar tipo
+            t['estado_str'] = 'Pendiente' if estado_int == 0 else 'Completada'
     conexion.close()
     return tareas
 
@@ -159,13 +430,13 @@ def obtener_resumen_semana():
 
     query_total = """
         SELECT COUNT(*) AS total
-        FROM TAREAS
-        WHERE Fecha_limite BETWEEN %s AND %s
+        FROM tareas
+        WHERE fecha_limite BETWEEN %s AND %s
     """
     query_completadas = """
         SELECT COUNT(*) AS completadas
-        FROM TAREAS
-        WHERE Estado = 1 AND Fecha_limite BETWEEN %s AND %s
+        FROM tareas
+        WHERE estado = 1 AND fecha_limite BETWEEN %s AND %s
     """
 
     cursor.execute(query_total, (inicio_semana, fin_semana))
@@ -186,70 +457,37 @@ def obtener_eventos_manana():
     hoy = datetime.now().date()
     manana = hoy + timedelta(days=1)
 
-    query = "SELECT COUNT(*) AS eventos FROM EVENTOS WHERE Fecha_evento = %s"
+    query = "SELECT COUNT(*) AS eventos FROM eventos WHERE fecha_evento = %s"
     cursor.execute(query, (manana,))
     cantidad = cursor.fetchone()['eventos']
 
     conn.close()
     return cantidad
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# FUNCIONES PARA GESTIONAR SUBTAREAS ------------------------------ TODO: IMPLEMENTAR EN APP.PY (SI ES NECESARIO)
-
-# CREAR SUBTAREA
-def crear_subtarea(nombre, descripcion, fecha_limite, tarea_padre_id, creador_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        INSERT INTO SUBTAREAS (Nombre, Descripcion, Fecha_limite, tareaPadre, creadorSub)
-        VALUES (%s, %s, %s, %s, %s)
-    """
-    cursor.execute(query, (nombre, descripcion, fecha_limite, tarea_padre_id, creador_id))
-    conn.commit()
-    conn.close()
-
-# MODIFICAR SUBTAREA
-def modificar_subtarea(subtarea_id, nombre, descripcion, fecha_limite):
-    conn = get_connection()
-    cursor = conn.cursor()
-    query = """
-        UPDATE SUBTAREAS
-        SET Nombre=%s, Descripcion=%s, Fecha_limite=%s
-        WHERE ID=%s
-    """
-    cursor.execute(query, (nombre, descripcion, fecha_limite, subtarea_id))
-    conn.commit()
-    conn.close()
-
-# ELIMINAR SUBTAREA
-def eliminar_subtarea(subtarea_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM SUBTAREAS WHERE ID=%s", (subtarea_id,))
-    conn.commit()
-    conn.close()
-    
-# OBTENER SUBTAREAS
-def obtener_subtareas():
+def obtener_usuarios():
+    """Devuelve la lista de usuarios (id y nombre) para el admin."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM SUBTAREAS")
-    subtareas = cursor.fetchall()
+    cursor.execute("SELECT id, usuario FROM usuario ORDER BY usuario ASC")
+    usuarios = cursor.fetchall()
     conn.close()
-    return subtareas
+    return usuarios
+
+def registrar_auditoria(usuario, accion, tipo, objeto_id):
+    """Registra una acción en la tabla auditoria."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = "INSERT INTO auditoria (usuario, accion, tipo, objeto_id, fecha) VALUES (%s, %s, %s, %s, NOW())"
+    cursor.execute(query, (usuario, accion, tipo, objeto_id))
+    conn.commit()
+    conn.close()
+
+def obtener_auditoria():
+    """Devuelve las últimas acciones registradas en auditoria."""
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM auditoria ORDER BY fecha DESC LIMIT 50")
+    registros = cursor.fetchall()
+    conn.close()
+    return registros
+

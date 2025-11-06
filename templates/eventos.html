@@ -36,6 +36,7 @@
 
 <main class="flex-1 p-8 bg-background-light text-text-light">
     <div class="flex flex-col gap-8">
+
         <!-- Barra de búsqueda -->
         <div class="px-4 py-3">
             <label class="flex flex-col min-w-40 h-12 w-full max-w-lg mx-auto">
@@ -63,22 +64,28 @@
     <div id="eventos-grid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {% for evento in eventos %}
             <div class="p-4 @container">
-                <div
-                    class="flex flex-col items-stretch justify-start rounded-xl @xl:flex-row @xl:items-start shadow-lg bg-white transition-shadow duration-300 hover:shadow-2xl hover:shadow-primary/20">
-                    <!-- <div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-t-xl @xl:rounded-l-xl @xl:rounded-t-none"
+
+                <!-- Evento -->
+                <div class="flex flex-col items-stretch justify-start rounded-xl @xl:flex-row @xl:items-start shadow-lg bg-white transition-shadow duration-300 hover:shadow-2xl hover:shadow-primary/20">
+                    
+                    <!-- Imagen del evento (default) -->
+                    <div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-t-xl @xl:rounded-l-xl @xl:rounded-t-none"
                         style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZ_KjxGRwCK38hWo0fYhIZug9rsrz-X2-vNAjadAui1Ze2H8vxVlHB8PXk8EObZOFGR4ajiqeJF3PsQUjjatrJBantZ9oQ0fJPZQO9Y8luyKKVsA9yC3DvEhzeykCfHlUbjW0xXIC73lF9p10nTC31kp6HDfrhrV6r39OG0ADJL24NkTwq7nYU1lzDrIiWhp5vG8Uqs9tjY-waOOvdmpQeofXCjshsPWDqyPd_089E1IdVKxWWw7QTOGNx4r7MPoy9tJaBM8ROqRI");'>
-                    </div> -->
+                    </div>
                     <div class="flex w-full min-w-72 grow flex-col xl:flex-row xl:items-start xl:justify-between items-stretch gap-2 p-4">
                         <div class="flex flex-col gap-2">
-                            <p class="text-text-light text-lg font-bold leading-tight text-left">{{ evento.Nombre }}</p>
+                            <p class="text-text-light text-lg font-bold leading-tight text-left">{{ evento.nombre }}</p>
+                            {% if evento.descripcion %}
+                            <p class="text-gray-600 text-sm leading-tight text-left">{{ evento.descripcion }}</p>
+                            {% endif %}
                             <div class="flex flex-col gap-1 mt-2 text-left">
                                 <p class="text-gray-500 text-sm font-normal">
                                     <span class="material-symbols-outlined text-sm align-middle mr-1">calendar_today</span>
-                                    {{ evento.Fecha_evento }}
+                                    {{ evento.fecha_evento }}
                                 </p>
                                 <p class="text-gray-500 text-sm font-normal">
                                     <span class="material-symbols-outlined text-sm align-middle mr-1">schedule</span>
-                                    {%- set _hora = evento.Hora_evento|string -%}
+                                    {%- set _hora = evento.hora_evento|string -%}
                                     {%- if _hora -%}
                                         {{ _hora.split(':')[:2]|join(':') }}
                                     {%- else -%}
@@ -87,14 +94,15 @@
                                 </p>
                             </div>
                         </div>
+                        
                         <!-- Botones de acción (a la derecha) -->
                         <div class="flex gap-2 mt-4 xl:mt-0 items-center">
-                            <button data-id="{{ evento.ID }}" data-type="evento" class="btn-view-event flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
+                            <button data-id="{{ evento.id }}" data-type="evento" class="btn-view-event flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
                                 <span class="material-symbols-outlined text-sm mr-1">visibility</span>
                                 Ver
                             </button>
-                            <form method="POST" action="{{ url_for('eliminar_evento_view', id=evento.ID) }}" class="inline">
-                                <button type="submit" class="flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors text-sm">
+                            <form method="POST" action="{{ url_for('eliminar_evento_view', id=evento.id) }}" class="inline">
+                                <button type="submit" onclick="return confirm('¿Estás seguro de eliminar este evento?')" class="flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors text-sm">
                                     <span class="material-symbols-outlined text-sm mr-1">delete</span>
                                     Eliminar
                                 </button>
