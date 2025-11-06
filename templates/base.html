@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <!-- Meta viewport para habilitar el responsive real en móviles (iPhone Safari requiere esto) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <title>{% block title %}MyPlanner{% endblock %}</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -93,10 +95,11 @@
                 <div class="col-12">
                     <!-- Footer -->
                     <footer class="d-flex justify-content-between align-items-center small text-muted border-top pt-3">
-                        <div>MyPlanner • Versión 1.3</div>
-                        <div>
+                        <div class="m-6 pl-8">MyPlanner • Versión 1.3</div>
+                        <div>Todos los derechos reservados © 2025 - Pedro de las Heras</div>
+                        <div  class="m-6 pr-8">
                             <a href="{{ url_for('ayuda') }}" class="text-muted me-3">Ayuda</a>
-                            <a href="{{ url_for('contacto') }}" class="text-muted">Contacto</a>
+                            <a href="{{ url_for('contacto') }}" class="text-muted p-8">Contacto</a>
                         </div>
                     </footer>
                 </div>

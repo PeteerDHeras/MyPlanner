@@ -312,57 +312,64 @@ document.addEventListener('DOMContentLoaded', function () {
   function abrirModalCreacionRapida(fechaStr) {
     // Evitar abrir múltiples modales
     if (document.getElementById('quick-event-overlay')) return;
+
     const overlay = document.createElement('div');
     overlay.id = 'quick-event-overlay';
-    overlay.style.position = 'fixed';
-    overlay.style.inset = '0';
-    overlay.style.background = 'rgba(0,0,0,0.45)';
-    overlay.style.zIndex = '1060';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
+    overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[1060] animate-[fadeIn_0.25s_ease]';
 
     const modal = document.createElement('div');
-    modal.style.background = '#fff';
-    modal.style.width = '100%';
-    modal.style.maxWidth = '420px';
-    modal.style.borderRadius = '10px';
-    modal.style.padding = '18px 20px 20px';
-    modal.style.boxShadow = '0 8px 28px rgba(0,0,0,0.25)';
+    modal.className = 'relative bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 overflow-hidden animate-[slideUp_0.35s_ease]';
     modal.innerHTML = `
-      <h5 style="margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;">Nuevo evento rápido <button type="button" id="quick-close" class="btn btn-sm btn-outline-secondary">✕</button></h5>
-      <form id="quick-event-form">
-        <div class="mb-2">
-          <label class="form-label" style="font-weight:600;">Nombre *</label>
-          <input name="nombre" type="text" class="form-control" maxlength="100" required />
+      <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 -m-6 mb-6 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-white text-3xl">event</span>
+          <h3 class="text-white text-xl font-semibold m-0">Nuevo evento rápido</h3>
         </div>
-        <div class="mb-2">
-          <label class="form-label" style="font-weight:600;">Descripción</label>
-          <textarea name="descripcion" rows="2" class="form-control" maxlength="500" placeholder="Opcional"></textarea>
+        <button type="button" id="quick-close" class="text-white/80 hover:text-white transition" aria-label="Cerrar">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <form id="quick-event-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre *</label>
+          <input name="nombre" type="text" maxlength="100" required
+            class="w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 text-gray-900 placeholder-gray-400" placeholder="Reunión semanal" />
         </div>
-        <div class="mb-2">
-          <label class="form-label" style="font-weight:600;">Fecha inicio *</label>
-          <input name="fecha_evento" type="date" class="form-control" value="${fechaStr}" required />
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
+          <textarea name="descripcion" rows="2" maxlength="500"
+            class="w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 text-gray-900 placeholder-gray-400 resize-none" placeholder="Opcional"></textarea>
         </div>
-        <div class="mb-2" style="display:flex;gap:8px;">
-          <div style="flex:1;">
-            <label class="form-label" style="font-weight:600;">Hora inicio</label>
-            <input name="hora_evento" type="time" class="form-control" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Fecha inicio *</label>
+            <input name="fecha_evento" type="date" value="${fechaStr}" required
+              class="w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 text-gray-900" />
           </div>
-          <div style="flex:1;">
-            <label class="form-label" style="font-weight:600;">Hora fin</label>
-            <input name="hora_fin" type="time" class="form-control" />
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Fecha fin</label>
+            <input name="fecha_fin" type="date"
+              class="w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 text-gray-900" />
           </div>
         </div>
-        <div class="mb-2">
-          <label class="form-label" style="font-weight:600;">Fecha fin</label>
-          <input name="fecha_fin" type="date" class="form-control" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Hora inicio</label>
+            <input name="hora_evento" type="time"
+              class="w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 text-gray-900" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Hora fin</label>
+            <input name="hora_fin" type="time"
+              class="w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2 text-gray-900" />
+          </div>
         </div>
-        <div class="d-flex justify-content-end gap-2 mt-2">
-          <button type="button" id="quick-cancel" class="btn btn-light">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Crear</button>
+        <div id="quick-error" class="hidden rounded-lg border border-red-300 bg-red-50 text-red-700 text-sm px-3 py-2"></div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="quick-cancel" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition font-medium">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold shadow hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 focus:ring-2 focus:ring-indigo-500 transition">Crear evento</button>
         </div>
-        <div id="quick-error" class="text-danger small mt-2" style="display:none;"></div>
+        <p class="text-xs text-gray-500">Puedes editar más detalles después haciendo click en el evento.</p>
       </form>
     `;
     overlay.appendChild(modal);
@@ -407,12 +414,10 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
       .then(res => {
         if (!res.ok) { mostrarError(res.body.error || 'Error creando evento'); return; }
-        // Añadir evento inmediatamente (optimista) usando datos devueltos
-        try { if (window.calendar) { window.calendar.addEvent(res.body); } } catch(_) {}
+        // Recargar eventos desde servidor para asegurar coherencia
+        if (window.calendar) window.calendar.refetchEvents();
         showToast('Evento creado', 'success');
         cerrar();
-        // Refetch para asegurar coherencia (IDs, etc.)
-        if (window.calendar) window.calendar.refetchEvents();
       })
       .catch(err => { console.error(err); mostrarError('Error de red creando evento'); });
     });
@@ -420,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function mostrarError(msg){
       const box = modal.querySelector('#quick-error');
       box.textContent = msg;
-      box.style.display = 'block';
+      box.classList.remove('hidden');
     }
   }
 

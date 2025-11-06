@@ -243,7 +243,9 @@ def crear_evento_view():
         # VALIDAR DATOS DEL FORMULARIO
         nombre = sanitizar_texto(request.form.get('nombre', ''))
         fecha_evento = request.form.get('fecha_evento', '').strip()
-        hora_evento = request.form.get('hora_evento', '').strip()
+        hora_evento_raw = request.form.get('hora_evento', '').strip()
+        # Tratar hora vacía como evento all-day -> '00:00'
+        hora_evento = (hora_evento_raw or '00:00')[:5]
         descripcion = sanitizar_texto(request.form.get('descripcion', ''))
         fecha_fin = request.form.get('fecha_fin', '').strip() or None
         hora_fin = request.form.get('hora_fin', '').strip() or None
@@ -507,7 +509,9 @@ def actualizar_evento_api(evento_id):
 
     descripcion = sanitizar_texto(data.get("descripcion", ""))
     fecha_inicio = data["fecha_evento"].strip()
-    hora_inicio = data.get("hora_evento", "00:00:00").strip()[:5]
+    # Normalizar hora de inicio: si viene vacía -> considerar evento "all-day" y usar 00:00
+    hora_inicio_raw = data.get("hora_evento")
+    hora_inicio = (hora_inicio_raw or "00:00").strip()[:5]
     
     # Validar formatos
     if not validar_fecha_formato(fecha_inicio):
@@ -515,17 +519,19 @@ def actualizar_evento_api(evento_id):
     if not validar_fecha_no_pasada(fecha_inicio):
         return jsonify({"error": "Fecha de evento debe ser posterior a hoy"}), 400
     
-    if not validar_hora_formato(hora_inicio):
-        return jsonify({"error": "Formato de hora inválido"}), 400
+    # Validar formato sólo si la hora existe (siempre existirá tras normalización). Si se quiere permitir all-day sin hora,
+    # se podría omitir esta validación cuando hora_inicio == '00:00' y fecha_fin/hora_fin son None.
+    if hora_inicio and not validar_hora_formato(hora_inicio):
+        return jsonify({"error": "Hora de evento inválida"}), 400
     
     if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
         return jsonify({"error": "Descripción inválida"}), 400
     
     # Limpiar valores opcionales
     fecha_fin = limpiar_valor_opcional(data.get("fecha_fin"))
-    hora_fin = limpiar_valor_opcional(data.get("hora_fin"))
-    if hora_fin:
-        hora_fin = hora_fin[:5]
+    hora_fin_raw = limpiar_valor_opcional(data.get("hora_fin"))
+    # Tratar hora fin vacía como None
+    hora_fin = hora_fin_raw[:5] if hora_fin_raw else None
     # Validar rango de horas si ambas existen
     if hora_fin and not validar_rango_horas(hora_inicio, hora_fin):
         return jsonify({"error": "La hora fin debe ser posterior a la hora inicio"}), 400
@@ -582,6 +588,7 @@ def crear_evento_api():
     Devuelve el evento creado en formato FullCalendar para inyección directa.
     """
     data = request.get_json()
+    print(f"[DEBUG] crear_evento_api raw data: {data}")
     if not data:
         return jsonify({'error': 'JSON inválido'}), 400
 
@@ -596,22 +603,31 @@ def crear_evento_api():
 
     # Validaciones básicas
     if not validar_texto_seguro(nombre, 100, required=True):
+        print("[DEBUG] Nombre inválido", nombre)
         return jsonify({'error': 'Nombre inválido'}), 400
     if not validar_fecha_formato(fecha_evento):
+        print("[DEBUG] Fecha inválida", fecha_evento)
         return jsonify({'error': 'Fecha inválida'}), 400
     if not validar_fecha_no_pasada(fecha_evento):
+        print("[DEBUG] Fecha pasada", fecha_evento)
         return jsonify({'error': 'Fecha debe ser hoy o futura'}), 400
     if hora_evento and not validar_hora_formato(hora_evento):
+        print("[DEBUG] Hora inválida", hora_evento)
         return jsonify({'error': 'Hora inválida'}), 400
     if fecha_fin and not validar_fecha_formato(fecha_fin):
+        print("[DEBUG] Fecha fin inválida", fecha_fin)
         return jsonify({'error': 'Fecha fin inválida'}), 400
     if fecha_fin and not validar_fechas(fecha_evento, fecha_fin):
+        print("[DEBUG] Rango fecha inválido", fecha_evento, fecha_fin)
         return jsonify({'error': 'Fecha fin debe ser posterior a inicio'}), 400
     if hora_fin and not validar_hora_formato(hora_fin):
+        print("[DEBUG] Hora fin inválida", hora_fin)
         return jsonify({'error': 'Hora fin inválida'}), 400
     if hora_fin and not validar_rango_horas(hora_evento, hora_fin):
+        print("[DEBUG] Rango hora inválido", hora_evento, hora_fin)
         return jsonify({'error': 'Hora fin debe ser posterior a hora inicio'}), 400
     if descripcion and not validar_texto_seguro(descripcion, 500, required=False):
+        print("[DEBUG] Descripción inválida", descripcion)
         return jsonify({'error': 'Descripción inválida'}), 400
 
     # Obtener usuario
@@ -623,15 +639,17 @@ def crear_evento_api():
         crear_evento(
             nombre=nombre,
             fecha_evento=fecha_evento,
-            hora_evento=hora_evento+":00",  # asegurar formato completo HH:MM:SS para la BD
+            hora_evento=hora_evento,  # Ya está en formato HH:MM
             creador_id=creador_id,
             fecha_fin=fecha_fin,
-            hora_fin=hora_fin+":00" if hora_fin else None,
-            descripcion=descripcion
+            hora_fin=hora_fin,  # Ya está en formato HH:MM
+            descripcion=descripcion or None
         )
     except ValueError as e:
+        print(f"[DEBUG] ValueError creando evento: {e}")
         return jsonify({'error': str(e)}), 400
-    except Exception:
+    except Exception as ex:
+        print(f"[DEBUG] Exception creando evento: {ex}")
         return jsonify({'error': 'Error interno creando evento'}), 500
 
     # Recuperar el evento recién creado (tomar el último por fecha/hora y nombre)

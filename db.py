@@ -1,12 +1,23 @@
 from datetime import datetime, timedelta
 import mysql.connector
+from mysql.connector import pooling
 import bcrypt
 import re
 import os
 from dotenv import load_dotenv
+from functools import wraps
+import time
 
 # Cargar variables de entorno
 load_dotenv()
+
+# Pool de conexiones global
+_connection_pool = None
+
+# Sistema de caché simple
+_cache = {}
+_cache_timestamps = {}
+CACHE_DURATION = 30  # segundos
 
 
 # ----------- FUNCIONES DE VALIDACIÓN Y SEGURIDAD -------------------
@@ -55,36 +66,95 @@ def validar_usuario_password(usuario, password):
 
 def get_connection():
     """
-    Crea una conexión segura a la base de datos MySQL.
+    Obtiene una conexión del pool de conexiones.
     Usa variables de entorno para las credenciales.
     Compatible con Aiven MySQL con SSL/TLS.
     """
-    # Obtener credenciales de variables de entorno
-    db_host = os.getenv('DB_HOST', 'localhost')
-    db_port = int(os.getenv('DB_PORT', 3306))
-    db_user = os.getenv('DB_USER', 'pdelasheras')
-    db_password = os.getenv('DB_PASSWORD', 'pdelasheras')
-    db_name = os.getenv('DB_NAME', 'myplanner_db')
+    global _connection_pool
     
-    # Configurar conexión con o sin SSL según el host
-    connection_config = {
-        'host': db_host,
-        'port': db_port,
-        'user': db_user,
-        'password': db_password,
-        'database': db_name,
-        'autocommit': False,
-        'connection_timeout': 10
-    }
+    # Crear pool si no existe
+    if _connection_pool is None:
+        db_host = os.getenv('DB_HOST', 'localhost')
+        db_port = int(os.getenv('DB_PORT', 3306))
+        db_user = os.getenv('DB_USER', 'pdelasheras')
+        db_password = os.getenv('DB_PASSWORD', 'pdelasheras')
+        db_name = os.getenv('DB_NAME', 'myplanner_db')
+        
+        connection_config = {
+            'pool_name': 'myplanner_pool',
+            'pool_size': 5,  # 5 conexiones en el pool
+            'pool_reset_session': True,
+            'host': db_host,
+            'port': db_port,
+            'user': db_user,
+            'password': db_password,
+            'database': db_name,
+            'autocommit': False,
+            'connection_timeout': 10
+        }
+        
+        # Si es Aiven (contiene aivencloud.com), habilitar SSL sin verificación
+        if 'aivencloud.com' in db_host:
+            connection_config['ssl_disabled'] = False
+            connection_config['ssl_verify_cert'] = False
+            connection_config['ssl_verify_identity'] = False
+        
+        _connection_pool = pooling.MySQLConnectionPool(**connection_config)
     
-    # Si es Aiven (contiene aivencloud.com), habilitar SSL sin verificación para desarrollo local
-    if 'aivencloud.com' in db_host:
-        # Para desarrollo local: SSL habilitado pero sin verificar certificados
-        connection_config['ssl_disabled'] = False
-        connection_config['ssl_verify_cert'] = False
-        connection_config['ssl_verify_identity'] = False
-    
-    return mysql.connector.connect(**connection_config)
+    # Obtener conexión del pool
+    return _connection_pool.get_connection()
+
+
+# ----------- SISTEMA DE CACHÉ -------------------
+
+def cache_with_expiry(duration=CACHE_DURATION):
+    """
+    Decorador para cachear resultados de funciones con expiración.
+    Útil para consultas frecuentes que no cambian constantemente.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Crear clave única basada en función y argumentos
+            cache_key = f"{func.__name__}:{args}:{kwargs}"
+            
+            # Verificar si existe en caché y no ha expirado
+            if cache_key in _cache:
+                timestamp = _cache_timestamps.get(cache_key, 0)
+                if time.time() - timestamp < duration:
+                    print(f"[CACHE HIT] {func.__name__}")
+                    return _cache[cache_key]
+            
+            # Si no está en caché o expiró, ejecutar función
+            print(f"[CACHE MISS] {func.__name__} - Consultando BD")
+            result = func(*args, **kwargs)
+            
+            # Guardar en caché
+            _cache[cache_key] = result
+            _cache_timestamps[cache_key] = time.time()
+            
+            return result
+        return wrapper
+    return decorator
+
+
+def invalidate_cache(pattern=None):
+    """
+    Invalida el caché. Si se proporciona un patrón, solo invalida las claves que lo contengan.
+    Si no se proporciona patrón, limpia todo el caché.
+    """
+    global _cache, _cache_timestamps
+    if pattern is None:
+        _cache.clear()
+        _cache_timestamps.clear()
+        print("[CACHE] Caché completamente limpiado")
+    else:
+        keys_to_remove = [k for k in _cache.keys() if pattern in k]
+        for key in keys_to_remove:
+            _cache.pop(key, None)
+            _cache_timestamps.pop(key, None)
+        print(f"[CACHE] Invalidadas {len(keys_to_remove)} entradas con patrón '{pattern}'")
+
 
 # ----------- FUNCIONES PARA GESTIONAR USUARIOS -------------------
 
@@ -183,6 +253,8 @@ def crear_evento(nombre, fecha_evento, hora_evento, creador_id, fecha_fin=None, 
         """
         cursor.execute(query, (nombre, descripcion, fecha_evento, hora_evento, creador_id, fecha_fin, hora_fin))
         conn.commit()
+        # Invalidar caché de eventos
+        invalidate_cache('obtener_eventos')
     except Exception as e:
         conn.rollback()
         raise e
@@ -225,6 +297,8 @@ def modificar_evento(evento_id, nombre, fecha_evento, hora_evento, fecha_fin=Non
         """
         cursor.execute(query, (nombre, fecha_evento, hora_evento, fecha_fin, hora_fin, descripcion, evento_id))
         conn.commit()
+        # Invalidar caché de eventos
+        invalidate_cache('obtener_eventos')
     except Exception as e:
         conn.rollback()
         raise e
@@ -245,6 +319,8 @@ def eliminar_evento(evento_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM eventos WHERE id=%s", (evento_id,))
         conn.commit()
+        # Invalidar caché de eventos
+        invalidate_cache('obtener_eventos')
     except Exception as e:
         conn.rollback()
         raise e
@@ -252,6 +328,7 @@ def eliminar_evento(evento_id):
         conn.close()
 
 # OBTENER EVENTOS
+@cache_with_expiry(duration=30)
 def obtener_eventos(usuario_id=None):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -298,6 +375,8 @@ def crear_tarea(nombre, descripcion, fecha_limite, prioridad, creador_id, estado
         """
         cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, creador_id, estado))
         conn.commit()
+        # Invalidar caché de tareas
+        invalidate_cache('obtener_tareas')
     except Exception as e:
         conn.rollback()
         raise e
@@ -337,6 +416,8 @@ def modificar_tarea(tarea_id, nombre, descripcion, fecha_limite, prioridad, esta
         """
         cursor.execute(query, (nombre, descripcion, fecha_limite, prioridad, estado, tarea_id))
         conn.commit()
+        # Invalidar caché de tareas
+        invalidate_cache('obtener_tareas')
     except Exception as e:
         conn.rollback()
         raise e
@@ -356,6 +437,8 @@ def eliminar_tarea(tarea_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM tareas WHERE id=%s", (tarea_id,))
         conn.commit()
+        # Invalidar caché de tareas
+        invalidate_cache('obtener_tareas')
     except Exception as e:
         conn.rollback()
         raise e
@@ -378,6 +461,8 @@ def actualizar_estado_tarea(tarea_id, estado):
         query = "UPDATE tareas SET estado=%s WHERE id=%s"
         cursor.execute(query, (estado, tarea_id))
         conn.commit()
+        # Invalidar caché de tareas
+        invalidate_cache('obtener_tareas')
     except Exception as e:
         conn.rollback()
         raise e
@@ -385,6 +470,7 @@ def actualizar_estado_tarea(tarea_id, estado):
         conn.close()
 
 # OBTENER TAREAS
+@cache_with_expiry(duration=30)
 def obtener_tareas(usuario_id=None):
     conexion = get_connection()
     with conexion.cursor(dictionary=True) as cursor:
