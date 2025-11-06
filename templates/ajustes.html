@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Ajustes Admin{% endblock %}
+{% block content %}
+<h2 class="m-4">Ajustes de administración</h2>
+<form method="POST" class="mb-4">
+    <label for="usuario_id" class="form-label">Filtrar por usuario:</label>
+    <select name="usuario_id" id="usuario_id" class="form-select" onchange="this.form.submit()">
+        <option value="">-- Todos --</option>
+        {% for u in usuarios %}
+            <option value="{{ u.id }}" {% if usuario_id and usuario_id == u.id|string %}selected{% endif %}>{{ u.usuario }}</option>
+        {% endfor %}
+    </select>
+</form>
+<div class="row">
+    <div class="col-md-6">
+        <h4>Eventos</h4>
+        <ul class="list-group">
+            {% for e in eventos %}
+                <li class="list-group-item">
+                    <strong>{{ e.nombre }}</strong> - {{ e.fecha_evento }} {{ e.hora_evento }}
+                </li>
+            {% else %}
+                <li class="list-group-item">No hay eventos</li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="col-md-6">
+        <h4>Tareas</h4>
+        <ul class="list-group">
+            {% for t in tareas %}
+                <li class="list-group-item">
+                    <strong>{{ t.nombre }}</strong> - {{ t.fecha_limite }} ({{ t.estado_str }})
+                </li>
+            {% else %}
+                <li class="list-group-item">No hay tareas</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+<hr>
+<h4>Auditoría reciente</h4>
+<table class="table table-sm">
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+            <th>Tipo</th>
+            <th>ID</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in auditoria %}
+        <tr>
+            <td>{{ a.fecha }}</td>
+            <td>{{ a.usuario }}</td>
+            <td>{{ a.accion }}</td>
+            <td>{{ a.tipo }}</td>
+            <td>{{ a.objeto_id }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Sin registros</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

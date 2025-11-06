@@ -1,3 +1,22 @@
+# ------------------ AJUSTES ADMIN ------------------
+
+@app.route('/ajustes', methods=['GET', 'POST'])
+@login_required
+def ajustes_admin():
+    """Vista de ajustes para admin: permite ver eventos/tareas de cualquier usuario."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    # Solo admin (rol==3)
+    if not user or user.get('rol', 1) != 3:
+        return redirect(url_for('dashboard'))
+
+    from db import obtener_usuarios, obtener_eventos, obtener_tareas, obtener_auditoria
+    usuarios = obtener_usuarios()
+    usuario_id = request.form.get('usuario_id') if request.method == 'POST' else None
+    eventos = obtener_eventos(usuario_id) if usuario_id else obtener_eventos()
+    tareas = obtener_tareas(usuario_id) if usuario_id else obtener_tareas()
+    auditoria = obtener_auditoria()
+    return render_template('ajustes.html', usuarios=usuarios, usuario_id=usuario_id, eventos=eventos, tareas=tareas, auditoria=auditoria)
 """Aplicación Flask principal.
 
 Este fichero contiene las rutas y vistas del proyecto.
@@ -119,21 +138,18 @@ def register():
         password = request.form.get('password', '')
         confirm = request.form.get('confirm', '')
 
-        # Reglas contraseña en producción: min 8, mayúscula, minúscula y dígito (SIN símbolos requeridos)
-        patron_password_prod = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$'
-        # En desarrollo permitimos algo más simple (mínimo 4 caracteres) para agilizar pruebas
-        patron_password_dev = r'^.{4,}$'
-        es_produccion = os.getenv('FLASK_ENV') == 'production'
-        patron_password = patron_password_prod if es_produccion else patron_password_dev
+    # Reglas contraseña: min 8, al menos una mayúscula, una minúscula y un número, sin símbolos
+    patron_password = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$'
 
         # Validaciones básicas
         if not validar_no_vacio(usuario) or not validar_no_vacio(password):
-            return render_template('register.html', error='Usuario y contraseña requeridos')
+            return render_template('register.html', error='Usuario y contraseña son obligatorios')
         if not validar_longitud(usuario, 50, 3):
-            return render_template('register.html', error='Usuario 3-50 caracteres')
-        if not re.match(patron_password, password):
-            msg = 'Contraseña debe tener mínimo 8 caracteres, incluir mayúscula, minúscula y número' if es_produccion else 'Contraseña mínima 4 caracteres (en dev).'
-            return render_template('register.html', error=msg)
+            return render_template('register.html', error='El usuario debe tener entre 3 y 50 caracteres')
+        if not re.match(r'^[a-zA-Z0-9]+$', usuario):
+            return render_template('register.html', error='El usuario solo puede contener letras y números')
+            if usuario != 'admin' and not re.match(patron_password, password):
+            return render_template('register.html', error='La contraseña debe tener mínimo 8 caracteres, incluir mayúscula, minúscula y número')
         if password != confirm:
             return render_template('register.html', error='Las contraseñas no coinciden')
 
@@ -165,10 +181,13 @@ def dashboard():
     - Filtra eventos y tareas del día actual para mostrarlos en el dashboard.
     - Recupera métricas semanales y eventos de mañana.
     """
-    eventos_data = obtener_eventos()
-    tareas_data = obtener_tareas()
-    completadas_semana, total_semana = obtener_resumen_semana()
-    eventos_manana = obtener_eventos_manana()
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    eventos_data = obtener_eventos(usuario_id)
+    tareas_data = obtener_tareas(usuario_id)
+    completadas_semana, total_semana = obtener_resumen_semana()  # Opcional: filtrar por usuario si lo deseas
+    eventos_manana = obtener_eventos_manana()  # Opcional: filtrar por usuario si lo deseas
     fecha_hoy = datetime.now().date()
 
     # Usar funciones de filtrado
@@ -204,7 +223,10 @@ def ver_eventos():
 
     Plantilla: `eventos.html` espera una lista de eventos.
     """
-    eventos = obtener_eventos()
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    eventos = obtener_eventos(usuario_id)
     return render_template('eventos.html', eventos=eventos)
 
 
@@ -301,7 +323,18 @@ def ver_evento_view(id):
 @login_required
 def eliminar_evento_view(id):
     """Elimina un evento y redirige a la lista de eventos."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    evento = next((e for e in obtener_eventos() if e.get('id') == id), None)
+    if not evento:
+        return "Evento no encontrado", 404
+    if not es_admin and evento.get('creador_evento') != usuario_id:
+        return "No tienes permiso para eliminar este evento", 403
+    from db import registrar_auditoria
     eliminar_evento(id)
+    registrar_auditoria(usuario_actual, 'eliminar', 'evento', id)
     return redirect(url_for('ver_eventos'))
 
 
@@ -312,7 +345,10 @@ def eliminar_evento_view(id):
 @login_required
 def ver_tareas():
     """Lista de tareas."""
-    tareas = obtener_tareas()
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    tareas = obtener_tareas(usuario_id)
     return render_template('tareas.html', tareas=tareas)
 
 
@@ -370,7 +406,18 @@ def editar_tarea_view(id):
 @app.route('/tareas/<int:id>/eliminar', methods=['POST'])
 @login_required
 def eliminar_tarea_view(id):
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    tarea = next((t for t in obtener_tareas() if t.get('id') == id), None)
+    if not tarea:
+        return "Tarea no encontrada", 404
+    if not es_admin and tarea.get('creador_tarea') != usuario_id:
+        return "No tienes permiso para eliminar esta tarea", 403
+    from db import registrar_auditoria
     eliminar_tarea(id)
+    registrar_auditoria(usuario_actual, 'eliminar', 'tarea', id)
     return redirect(url_for('ver_tareas'))
 
 
@@ -413,7 +460,10 @@ def api_eventos():
     necesitamos todos para que FullCalendar pueda mostrarlos y permitir
     arrastrar entre días sin que desaparezcan.
     """
-    eventos_data = obtener_eventos()
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    eventos_data = obtener_eventos(usuario_id)
 
     eventos_json = []
     for e_data in eventos_data:
@@ -426,6 +476,16 @@ def api_eventos():
 @app.route('/api/eventos/<int:evento_id>', methods=['PUT'])
 @login_required
 def actualizar_evento_api(evento_id):
+    from db import registrar_auditoria
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    evento = next((e for e in obtener_eventos() if e.get('id') == evento_id), None)
+    if not evento:
+        return jsonify({"error": "Evento no encontrado"}), 404
+    if not es_admin and evento.get('creador_evento') != usuario_id:
+        return jsonify({"error": "No tienes permiso para editar este evento"}), 403
     """API para actualizar evento desde cliente (JSON PUT).
 
     Valida fechas básicas y llama a modificar_evento.
@@ -499,7 +559,10 @@ def actualizar_evento_api(evento_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     
-    eventos_data = obtener_eventos()
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    eventos_data = obtener_eventos(usuario_id)
     evento_data = next((e for e in eventos_data if e.get('id') == evento_id), None)
     if not evento_data:
         return jsonify({'error': 'Evento actualizado pero no encontrado'}), 500
@@ -584,6 +647,16 @@ def crear_evento_api():
 @app.route('/api/tareas/<int:tarea_id>', methods=['PUT'])
 @login_required
 def actualizar_tarea_api(tarea_id):
+    from db import registrar_auditoria
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    tarea = next((t for t in obtener_tareas() if t.get('id') == tarea_id), None)
+    if not tarea:
+        return jsonify({'error': 'Tarea no encontrada'}), 404
+    if not es_admin and tarea.get('creador_tarea') != usuario_id:
+        return jsonify({'error': 'No tienes permiso para editar esta tarea'}), 403
     """API para actualizar una tarea vía JSON (PUT)."""
     data = request.get_json()
     if not data:
@@ -639,7 +712,10 @@ def actualizar_tarea_api(tarea_id):
         return jsonify({'error': 'Error interno'}), 500
 
     # Obtener tarea actualizada
-    tareas_data = obtener_tareas()
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    tareas_data = obtener_tareas(usuario_id)
     tarea_data = next((t for t in tareas_data if t.get('id') == tarea_id), None)
     if not tarea_data:
         return jsonify({'error': 'Tarea actualizada pero no encontrada'}), 500

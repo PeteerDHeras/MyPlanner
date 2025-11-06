@@ -151,7 +151,7 @@ def obtener_usuario_por_nombre(nombre):
     conn = get_connection()
     try:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id FROM usuario WHERE usuario = %s", (nombre,))
+        cursor.execute("SELECT id, usuario, rol FROM usuario WHERE usuario = %s", (nombre,))
         usuario = cursor.fetchone()
         return usuario
     except Exception:
@@ -266,10 +266,13 @@ def eliminar_evento(evento_id):
         conn.close()
 
 # OBTENER EVENTOS
-def obtener_eventos():  
+def obtener_eventos(usuario_id=None):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM eventos ORDER BY fecha_evento ASC, hora_evento ASC")
+    if usuario_id:
+        cursor.execute("SELECT * FROM eventos WHERE creador_evento = %s ORDER BY fecha_evento ASC, hora_evento ASC", (usuario_id,))
+    else:
+        cursor.execute("SELECT * FROM eventos ORDER BY fecha_evento ASC, hora_evento ASC")
     eventos = cursor.fetchall()
     conn.close()
     return eventos
@@ -396,10 +399,13 @@ def actualizar_estado_tarea(tarea_id, estado):
         conn.close()
 
 # OBTENER TAREAS
-def obtener_tareas():
+def obtener_tareas(usuario_id=None):
     conexion = get_connection()
     with conexion.cursor(dictionary=True) as cursor:
-        cursor.execute("SELECT * FROM tareas")
+        if usuario_id:
+            cursor.execute("SELECT * FROM tareas WHERE creador_tarea = %s", (usuario_id,))
+        else:
+            cursor.execute("SELECT * FROM tareas")
         tareas = cursor.fetchall()
         for t in tareas:
             estado_val = t.get('estado', 0)
@@ -457,4 +463,31 @@ def obtener_eventos_manana():
 
     conn.close()
     return cantidad
+
+def obtener_usuarios():
+    """Devuelve la lista de usuarios (id y nombre) para el admin."""
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id, usuario FROM usuario ORDER BY usuario ASC")
+    usuarios = cursor.fetchall()
+    conn.close()
+    return usuarios
+
+def registrar_auditoria(usuario, accion, tipo, objeto_id):
+    """Registra una acción en la tabla auditoria."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = "INSERT INTO auditoria (usuario, accion, tipo, objeto_id, fecha) VALUES (%s, %s, %s, %s, NOW())"
+    cursor.execute(query, (usuario, accion, tipo, objeto_id))
+    conn.commit()
+    conn.close()
+
+def obtener_auditoria():
+    """Devuelve las últimas acciones registradas en auditoria."""
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM auditoria ORDER BY fecha DESC LIMIT 50")
+    registros = cursor.fetchall()
+    conn.close()
+    return registros
 
