@@ -1,3 +1,22 @@
+# ------------------ AJUSTES ADMIN ------------------
+
+@app.route('/ajustes', methods=['GET', 'POST'])
+@login_required
+def ajustes_admin():
+    """Vista de ajustes para admin: permite ver eventos/tareas de cualquier usuario."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    # Solo admin (rol==3)
+    if not user or user.get('rol', 1) != 3:
+        return redirect(url_for('dashboard'))
+
+    from db import obtener_usuarios, obtener_eventos, obtener_tareas, obtener_auditoria
+    usuarios = obtener_usuarios()
+    usuario_id = request.form.get('usuario_id') if request.method == 'POST' else None
+    eventos = obtener_eventos(usuario_id) if usuario_id else obtener_eventos()
+    tareas = obtener_tareas(usuario_id) if usuario_id else obtener_tareas()
+    auditoria = obtener_auditoria()
+    return render_template('ajustes.html', usuarios=usuarios, usuario_id=usuario_id, eventos=eventos, tareas=tareas, auditoria=auditoria)
 """Aplicación Flask principal.
 
 Este fichero contiene las rutas y vistas del proyecto.
@@ -129,7 +148,7 @@ def register():
             return render_template('register.html', error='El usuario debe tener entre 3 y 50 caracteres')
         if not re.match(r'^[a-zA-Z0-9]+$', usuario):
             return render_template('register.html', error='El usuario solo puede contener letras y números')
-        if not re.match(patron_password, password):
+            if usuario != 'admin' and not re.match(patron_password, password):
             return render_template('register.html', error='La contraseña debe tener mínimo 8 caracteres, incluir mayúscula, minúscula y número')
         if password != confirm:
             return render_template('register.html', error='Las contraseñas no coinciden')
@@ -304,7 +323,18 @@ def ver_evento_view(id):
 @login_required
 def eliminar_evento_view(id):
     """Elimina un evento y redirige a la lista de eventos."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    evento = next((e for e in obtener_eventos() if e.get('id') == id), None)
+    if not evento:
+        return "Evento no encontrado", 404
+    if not es_admin and evento.get('creador_evento') != usuario_id:
+        return "No tienes permiso para eliminar este evento", 403
+    from db import registrar_auditoria
     eliminar_evento(id)
+    registrar_auditoria(usuario_actual, 'eliminar', 'evento', id)
     return redirect(url_for('ver_eventos'))
 
 
@@ -376,7 +406,18 @@ def editar_tarea_view(id):
 @app.route('/tareas/<int:id>/eliminar', methods=['POST'])
 @login_required
 def eliminar_tarea_view(id):
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    tarea = next((t for t in obtener_tareas() if t.get('id') == id), None)
+    if not tarea:
+        return "Tarea no encontrada", 404
+    if not es_admin and tarea.get('creador_tarea') != usuario_id:
+        return "No tienes permiso para eliminar esta tarea", 403
+    from db import registrar_auditoria
     eliminar_tarea(id)
+    registrar_auditoria(usuario_actual, 'eliminar', 'tarea', id)
     return redirect(url_for('ver_tareas'))
 
 
@@ -435,6 +476,16 @@ def api_eventos():
 @app.route('/api/eventos/<int:evento_id>', methods=['PUT'])
 @login_required
 def actualizar_evento_api(evento_id):
+    from db import registrar_auditoria
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    evento = next((e for e in obtener_eventos() if e.get('id') == evento_id), None)
+    if not evento:
+        return jsonify({"error": "Evento no encontrado"}), 404
+    if not es_admin and evento.get('creador_evento') != usuario_id:
+        return jsonify({"error": "No tienes permiso para editar este evento"}), 403
     """API para actualizar evento desde cliente (JSON PUT).
 
     Valida fechas básicas y llama a modificar_evento.
@@ -596,6 +647,16 @@ def crear_evento_api():
 @app.route('/api/tareas/<int:tarea_id>', methods=['PUT'])
 @login_required
 def actualizar_tarea_api(tarea_id):
+    from db import registrar_auditoria
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    usuario_id = user['id'] if user else None
+    es_admin = user and user.get('rol', 1) == 3
+    tarea = next((t for t in obtener_tareas() if t.get('id') == tarea_id), None)
+    if not tarea:
+        return jsonify({'error': 'Tarea no encontrada'}), 404
+    if not es_admin and tarea.get('creador_tarea') != usuario_id:
+        return jsonify({'error': 'No tienes permiso para editar esta tarea'}), 403
     """API para actualizar una tarea vía JSON (PUT)."""
     data = request.get_json()
     if not data:
