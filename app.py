@@ -257,7 +257,7 @@ def calendar():
 
 # Ver todos los eventos
 @app.route('/eventos')
-#@login_required
+@login_required
 def ver_eventos():
     """Lista todos los eventos.
 
