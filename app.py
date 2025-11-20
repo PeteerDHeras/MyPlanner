@@ -10,6 +10,7 @@ Notas:
 """
 
 from datetime import datetime, time, timedelta
+import secrets
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from functools import wraps
 from db import *  # funciones de acceso a datos: obtener_eventos, crear_tarea, etc.
@@ -30,6 +31,11 @@ load_dotenv()
 # ------------------ CONFIGURACIÓN FLASK ------------------
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'clave_secreta_segura')
+
+# Sesiones activas (usuario -> {'token': str, 'last_active': datetime})
+# Nota: En producción con múltiples procesos/containers conviene usar tabla en BD o Redis.
+ACTIVE_USER_SESSIONS = {}
+SESSION_TTL_MINUTES = 30  # Expiración de sesión inactiva para permitir reconexión
 
 # Filtro Jinja para mostrar el usuario con primera letra mayúscula sin alterar el resto
 @app.template_filter('capitalizar_primera')
@@ -83,8 +89,19 @@ def login_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'usuario' not in session:
+        usuario = session.get('usuario')
+        token = session.get('session_token')
+        if not usuario or not token:
             return redirect(url_for('login'))
+        data = ACTIVE_USER_SESSIONS.get(usuario)
+        # Validar que exista y coincida token
+        if not data or data.get('token') != token:
+            # Sesión inválida (otro dispositivo inició sesión o expirada)
+            session.clear()
+            flash('Tu sesión ha sido invalidada (iniciada en otro dispositivo).', 'error')
+            return redirect(url_for('login'))
+        # Actualizar last_active
+        data['last_active'] = datetime.utcnow()
         return f(*args, **kwargs)
     return decorated_function
 
@@ -112,8 +129,26 @@ def login():
             errors.append('Usuario debe tener entre 3 y 50 caracteres')
         if errors:
             return render_template('login.html', errors=errors)
+        # Bloqueo si ya está activo en otro dispositivo y sesión no expirada
+        existing = ACTIVE_USER_SESSIONS.get(usuario)
+        if existing:
+            # Comprobar expiración por inactividad
+            last_active = existing.get('last_active')
+            if last_active and (datetime.utcnow() - last_active) < timedelta(minutes=SESSION_TTL_MINUTES):
+                return render_template('login.html', errors=['El usuario ya tiene una sesión activa en otro dispositivo. Intenta más tarde o cierra sesión allí.'])
+            else:
+                # Expirada -> permitir nuevo login anulando la anterior
+                ACTIVE_USER_SESSIONS.pop(usuario, None)
+
         if verificar_usuario(usuario, password):
             session['usuario'] = usuario
+            # Generar token único y registrar
+            token = secrets.token_urlsafe(16)
+            session['session_token'] = token
+            ACTIVE_USER_SESSIONS[usuario] = {
+                'token': token,
+                'last_active': datetime.utcnow()
+            }
             return redirect(url_for('dashboard'))
         return render_template('login.html', errors=['Credenciales inválidas'])
     return render_template('login.html')
@@ -122,6 +157,10 @@ def login():
 @app.route('/logout')
 def logout():
     """Cierra la sesión del usuario."""
+    usuario = session.get('usuario')
+    if usuario in ACTIVE_USER_SESSIONS:
+        ACTIVE_USER_SESSIONS.pop(usuario, None)
+    session.pop('session_token', None)
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
