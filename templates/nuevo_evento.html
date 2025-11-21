@@ -131,7 +131,7 @@
             <span>Guardar evento</span>
           </button>
           <a 
-            href="{{ url_for('ver_eventos') }}"
+            href="{% if referer == 'dashboard' %}{{ url_for('dashboard') }}{% else %}{{ url_for('ver_eventos') }}{% endif %}"
             class="flex items-center justify-center gap-2 bg-gray-200 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition duration-200"
           >
             <span class="material-symbols-outlined text-xl">cancel</span>

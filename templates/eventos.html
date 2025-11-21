@@ -45,8 +45,9 @@
     .evento-header h3 { text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
     .evento-header .material-symbols-outlined { text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
     /* Bloque fecha/hora mejorado */
-    .evento-meta { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.25rem; }
+    .evento-meta { display:flex; gap:.5rem; flex-wrap:nowrap; margin-top:.25rem; align-items:center; }
     .evento-meta-item { display:flex; align-items:center; gap:.35rem; padding:.45rem .6rem; border-radius:.6rem; background:linear-gradient(135deg, #2d2f33 0%, #3a3d44 50%, #4a4f58 100%); color:#fff; font-size:.70rem; line-height:1; position:relative; box-shadow:0 2px 4px rgba(0,0,0,.35); }
+    .evento-meta-item.hora-item { margin-left: auto; }
     .evento-meta-item .material-symbols-outlined { font-size:16px; opacity:.9; }
     .evento-meta-item .label { text-transform:uppercase; font-weight:600; letter-spacing:.5px; font-size:.60rem; opacity:.75; }
     .evento-meta-item .value { font-weight:600; font-size:.80rem; letter-spacing:.3px; }
@@ -110,7 +111,7 @@
                             <span class="value">{{ evento.fecha_evento }}</span>
                             <span class="label">Fecha</span>
                         </div>
-                        <div class="evento-meta-item">
+                        <div class="evento-meta-item hora-item">
                             <span class="material-symbols-outlined">schedule</span>
                             <span class="value">
                                 {%- set _hora = evento.hora_evento|string -%}
@@ -126,14 +127,14 @@
                     
                     <!-- Botones compactos -->
                     <div class="flex gap-2">
-                        <button data-id="{{ evento.id }}" data-type="evento" class="btn-view-event flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs font-medium">
-                            <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
-                            <span>Ver</span>
+                        <button data-id="{{ evento.id }}" data-type="evento" class="btn-view-event flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs font-medium">
+                            <span class="material-symbols-outlined" style="font-size: 14px;">visibility</span>
+                            <span class="text-xs">Ver</span>
                         </button>
                         <form method="POST" action="{{ url_for('eliminar_evento_view', id=evento.id) }}" class="flex-1">
-                            <button type="submit" onclick="return confirm('¿Estás seguro de eliminar este evento?')" class="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors text-xs font-medium">
-                                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
-                                <span>Eliminar</span>
+                            <button type="submit" onclick="return confirm('¿Estás seguro de eliminar este evento?')" class="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors text-xs font-medium">
+                                <span class="material-symbols-outlined" style="font-size: 14px;">delete</span>
+                                <span class="text-xs">Eliminar</span>
                             </button>
                         </form>
                     </div>

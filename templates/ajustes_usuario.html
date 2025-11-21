@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}Ajustes de Usuario{% endblock %}
+{% block content %}
+
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 py-12 px-4">
+  <div class="w-full max-w-2xl">
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full shadow-lg mb-4">
+        <span class="material-symbols-outlined text-white text-3xl">settings</span>
+      </div>
+      <h2 class="text-3xl font-bold text-gray-900">Ajustes de Usuario</h2>
+      <p class="text-gray-600 text-sm mt-2">Personaliza tu cuenta</p>
+    </div>
+
+    <!-- Errores -->
+    {% include '_errors.html' %}
+
+    <!-- Success messages -->
+    {% if success %}
+    <div class="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-lg">
+      <div class="flex items-center">
+        <span class="material-symbols-outlined text-green-600 mr-3">check_circle</span>
+        <p class="text-green-800 font-medium">{{ success }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Información actual del usuario -->
+    <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <span class="material-symbols-outlined">person</span>
+        <span>Información de la cuenta</span>
+      </h3>
+      <div class="bg-gray-50 rounded-lg p-4">
+        <p class="text-gray-700"><strong>Usuario actual:</strong> {{ session.get('usuario') }}</p>
+      </div>
+    </div>
+
+    <!-- Cambiar nombre de usuario -->
+    <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <span class="material-symbols-outlined">edit</span>
+        <span>Cambiar nombre de usuario</span>
+      </h3>
+      <form method="POST" action="{{ url_for('cambiar_nombre_usuario') }}" class="space-y-4">
+        <div>
+          <label for="nuevo_nombre" class="block text-sm font-semibold text-gray-700 mb-2">
+            Nuevo nombre de usuario *
+          </label>
+          <input 
+            type="text" 
+            id="nuevo_nombre" 
+            name="nuevo_nombre" 
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+            placeholder="Ingresa tu nuevo nombre de usuario"
+            required
+          >
+        </div>
+        <div>
+          <label for="password_confirmar" class="block text-sm font-semibold text-gray-700 mb-2">
+            Contraseña actual (para confirmar) *
+          </label>
+          <input 
+            type="password" 
+            id="password_confirmar" 
+            name="password_confirmar" 
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+            placeholder="Confirma tu contraseña actual"
+            required
+          >
+        </div>
+        <button 
+          type="submit"
+          class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:from-indigo-600 hover:to-purple-700 transform hover:scale-[1.02] transition duration-200"
+        >
+          <span class="material-symbols-outlined text-xl">save</span>
+          <span>Cambiar nombre</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Cambiar contraseña -->
+    <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <span class="material-symbols-outlined">lock</span>
+        <span>Cambiar contraseña</span>
+      </h3>
+      <form method="POST" action="{{ url_for('cambiar_password') }}" class="space-y-4">
+        <div>
+          <label for="password_actual" class="block text-sm font-semibold text-gray-700 mb-2">
+            Contraseña actual *
+          </label>
+          <input 
+            type="password" 
+            id="password_actual" 
+            name="password_actual" 
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+            placeholder="Tu contraseña actual"
+            required
+          >
+        </div>
+        <div>
+          <label for="password_nueva" class="block text-sm font-semibold text-gray-700 mb-2">
+            Nueva contraseña *
+          </label>
+          <input 
+            type="password" 
+            id="password_nueva" 
+            name="password_nueva" 
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+            placeholder="Ingresa tu nueva contraseña"
+            required
+          >
+        </div>
+        <div>
+          <label for="password_nueva_confirmar" class="block text-sm font-semibold text-gray-700 mb-2">
+            Confirmar nueva contraseña *
+          </label>
+          <input 
+            type="password" 
+            id="password_nueva_confirmar" 
+            name="password_nueva_confirmar" 
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
+            placeholder="Confirma tu nueva contraseña"
+            required
+          >
+        </div>
+        <button 
+          type="submit"
+          class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:from-purple-600 hover:to-pink-700 transform hover:scale-[1.02] transition duration-200"
+        >
+          <span class="material-symbols-outlined text-xl">lock_reset</span>
+          <span>Cambiar contraseña</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- SECCIÓN ADMIN: Solo visible si es_admin -->
+    {% if es_admin %}
+    <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-2xl p-8 mb-6 border-2 border-purple-200">
+      <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+        <span class="material-symbols-outlined text-purple-600 text-3xl">admin_panel_settings</span>
+        <span>Panel de Administración</span>
+      </h2>
+
+      <!-- Tabs de admin -->
+      <div class="border-b border-gray-300 mb-6">
+        <nav class="-mb-px flex space-x-4">
+          <button onclick="showAdminTab('usuarios')" id="admin-tab-usuarios" class="admin-tab-btn border-b-2 border-purple-500 text-purple-600 py-3 px-1 font-medium text-sm">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">group</span>
+              Usuarios
+            </span>
+          </button>
+          <button onclick="showAdminTab('eventos')" id="admin-tab-eventos" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">event</span>
+              Eventos
+            </span>
+          </button>
+          <button onclick="showAdminTab('tareas')" id="admin-tab-tareas" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">task</span>
+              Tareas
+            </span>
+          </button>
+          <button onclick="showAdminTab('limpieza')" id="admin-tab-limpieza" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">cleaning_services</span>
+              Limpieza
+            </span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Panel: Usuarios -->
+      <div id="admin-panel-usuarios" class="admin-tab-content">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">ID</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Usuario</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Rol</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for u in admin_data.usuarios %}
+              <tr>
+                <td class="px-4 py-2 text-gray-900">{{ u.id }}</td>
+                <td class="px-4 py-2 font-medium text-gray-900">{{ u.usuario }}</td>
+                <td class="px-4 py-2">
+                  {% if u.rol == 3 %}
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Admin</span>
+                  {% else %}
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Usuario</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2">
+                  {% if u.rol != 3 %}
+                  <form method="POST" action="{{ url_for('eliminar_usuario_admin') }}" class="inline" onsubmit="return confirm('¿Eliminar usuario {{ u.usuario }}?')">
+                    <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                    <button type="submit" class="text-red-600 hover:text-red-900">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </form>
+                  {% else %}
+                  <span class="text-gray-400 text-xs">Protegido</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Panel: Eventos -->
+      <div id="admin-panel-eventos" class="admin-tab-content hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">ID</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Nombre</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Fecha</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Creador</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for e in admin_data.eventos %}
+              <tr>
+                <td class="px-4 py-2 text-gray-900">{{ e.id }}</td>
+                <td class="px-4 py-2 text-gray-900">{{ e.nombre }}</td>
+                <td class="px-4 py-2 text-gray-600">{{ e.fecha_evento }}</td>
+                <td class="px-4 py-2 text-gray-600">{{ e.creador_nombre }}</td>
+                <td class="px-4 py-2">
+                  <form method="POST" action="{{ url_for('eliminar_evento_admin') }}" class="inline" onsubmit="return confirm('¿Eliminar evento?')">
+                    <input type="hidden" name="evento_id" value="{{ e.id }}">
+                    <button type="submit" class="text-red-600 hover:text-red-900">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="px-4 py-3 text-center text-gray-500">No hay eventos</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Panel: Tareas -->
+      <div id="admin-panel-tareas" class="admin-tab-content hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">ID</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Nombre</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Fecha Límite</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Estado</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Creador</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {% for t in admin_data.tareas %}
+              <tr>
+                <td class="px-4 py-2 text-gray-900">{{ t.id }}</td>
+                <td class="px-4 py-2 text-gray-900">{{ t.nombre }}</td>
+                <td class="px-4 py-2 text-gray-600">{{ t.fecha_limite }}</td>
+                <td class="px-4 py-2">
+                  {% if t.estado == 1 %}
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Completada</span>
+                  {% else %}
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 text-gray-600">{{ t.creador_nombre }}</td>
+                <td class="px-4 py-2">
+                  <form method="POST" action="{{ url_for('eliminar_tarea_admin') }}" class="inline" onsubmit="return confirm('¿Eliminar tarea?')">
+                    <input type="hidden" name="tarea_id" value="{{ t.id }}">
+                    <button type="submit" class="text-red-600 hover:text-red-900">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="px-4 py-3 text-center text-gray-500">No hay tareas</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Panel: Limpieza -->
+      <div id="admin-panel-limpieza" class="admin-tab-content hidden">
+        <p class="text-gray-600 mb-4">Elimina eventos y tareas cuya fecha haya pasado hace más de X días.</p>
+        <form method="POST" action="{{ url_for('limpiar_datos_admin') }}" onsubmit="return confirm('¿Confirmar limpieza de datos antiguos?')" class="space-y-4">
+          <div>
+            <label for="dias" class="block text-sm font-medium text-gray-700 mb-2">
+              Eliminar datos con más de (días):
+            </label>
+            <input 
+              type="number" 
+              id="dias" 
+              name="dias" 
+              value="7"
+              min="1"
+              max="365"
+              class="w-32 px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+          </div>
+          <div class="flex justify-end">
+            <button 
+              type="submit"
+              class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg font-semibold text-sm shadow-sm"
+            >
+              <span class="material-symbols-outlined text-base">delete_sweep</span>
+              <span>Ejecutar Limpieza</span>
+            </button>
+          </div>
+        </form>
+        <div class="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded text-sm">
+          <p class="text-yellow-800 font-medium">⚠️ Esta acción eliminará permanentemente los datos antiguos.</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function showAdminTab(tabName) {
+      // Ocultar todos los paneles
+      document.querySelectorAll('.admin-tab-content').forEach(panel => {
+        panel.classList.add('hidden');
+      });
+      
+      // Remover estado activo de todos los tabs
+      document.querySelectorAll('.admin-tab-btn').forEach(tab => {
+        tab.classList.remove('border-purple-500', 'text-purple-600');
+        tab.classList.add('border-transparent', 'text-gray-500');
+      });
+      
+      // Mostrar panel seleccionado
+      document.getElementById('admin-panel-' + tabName).classList.remove('hidden');
+      
+      // Activar tab seleccionado
+      const activeTab = document.getElementById('admin-tab-' + tabName);
+      activeTab.classList.remove('border-transparent', 'text-gray-500');
+      activeTab.classList.add('border-purple-500', 'text-purple-600');
+    }
+    </script>
+    {% endif %}
+
+    <!-- Botón volver -->
+    <div class="text-center">
+      <a 
+        href="{{ url_for('dashboard') }}"
+        class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+      >
+        <span class="material-symbols-outlined">arrow_back</span>
+        <span>Volver al Panel Principal</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

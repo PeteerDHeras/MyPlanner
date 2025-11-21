@@ -1,6 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Calendario{% endblock %}
 {% block content %}
+<style>
+/* Estilos para diferenciar tareas de eventos en el calendario */
+.fc .tarea-evento {
+    background-color: #10b981 !important;
+    border-color: #059669 !important;
+}
+.fc .tarea-evento:hover {
+    background-color: #059669 !important;
+}
+/* Mejorar tipografía del header del calendario */
+.fc .fc-toolbar-title {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+}
+.fc .fc-button {
+    font-family: 'Inter', sans-serif !important;
+}
+</style>
 <div class="container-lg border border-2 border-dark rounded-4 pt-6 mt-4 ">
     <div class="row">
         <div class="col-12">

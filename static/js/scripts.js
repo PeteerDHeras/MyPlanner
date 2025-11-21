@@ -959,6 +959,10 @@ document.addEventListener('click', function (e) {
               if (type === 'tarea' && window.calendar) {
                 try { window.calendar.refetchEvents(); } catch(e) { console.warn('Refetch falló', e); }
               }
+              // Si estamos en dashboard, recargar para actualizar contadores y listas
+              if (window.location.pathname === '/dashboard') {
+                setTimeout(() => { location.reload(); }, 300);
+              }
             })
             .catch(err => { console.error(err); alert('Error al eliminar el elemento'); });
       });

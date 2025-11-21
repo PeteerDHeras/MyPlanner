@@ -11,7 +11,7 @@ Notas:
 
 from datetime import datetime, time, timedelta
 import secrets
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, get_flashed_messages
 from functools import wraps
 from db import *  # funciones de acceso a datos: obtener_eventos, crear_tarea, etc.
 from models import Evento, Tarea
@@ -141,7 +141,10 @@ def login():
                 ACTIVE_USER_SESSIONS.pop(usuario, None)
 
         if verificar_usuario(usuario, password):
+            # Obtener información del usuario incluyendo rol
+            user = obtener_usuario_por_nombre(usuario)
             session['usuario'] = usuario
+            session['user_rol'] = user.get('rol', 1) if user else 1
             # Generar token único y registrar
             token = secrets.token_urlsafe(16)
             session['session_token'] = token
@@ -933,25 +936,24 @@ def actualizar_tarea_api(tarea_id):
     return jsonify(tarea.to_dict()), 200
 
 
-# ------------------ AJUSTES ADMIN ------------------
+# ------------------ (Eliminado) Ruta ajustes_admin unificada en ajustes_usuario ------------------
 
-@app.route('/ajustes', methods=['GET', 'POST'])
-@login_required
-def ajustes_admin():
-    """Vista de ajustes para admin: permite ver eventos/tareas de cualquier usuario."""
-    usuario_actual = session.get('usuario')
-    user = obtener_usuario_por_nombre(usuario_actual)
-    # Solo admin (rol==3)
-    if not user or user.get('rol', 1) != 3:
-        return redirect(url_for('dashboard'))
-
-    from db import obtener_usuarios, obtener_eventos, obtener_tareas, obtener_auditoria
+def _build_admin_data():
+    """Helper para construir datos administrativos si el usuario es admin."""
+    from db import obtener_usuarios, obtener_eventos, obtener_tareas
     usuarios = obtener_usuarios()
-    usuario_id = request.form.get('usuario_id') if request.method == 'POST' else None
-    eventos = obtener_eventos(usuario_id) if usuario_id else obtener_eventos()
-    tareas = obtener_tareas(usuario_id) if usuario_id else obtener_tareas()
-    auditoria = obtener_auditoria()
-    return render_template('ajustes.html', usuarios=usuarios, usuario_id=usuario_id, eventos=eventos, tareas=tareas, auditoria=auditoria)
+    eventos_raw = obtener_eventos()
+    tareas_raw = obtener_tareas()
+    usuarios_map = {u['id']: u['usuario'] for u in usuarios}
+    for e in eventos_raw:
+        e['creador_nombre'] = usuarios_map.get(e.get('creador_evento'), 'Desconocido')
+    for t in tareas_raw:
+        t['creador_nombre'] = usuarios_map.get(t.get('creador_tarea'), 'Desconocido')
+    return {
+        'usuarios': usuarios,
+        'eventos': eventos_raw,
+        'tareas': tareas_raw
+    }
 
 
 @app.route('/admin/limpiar-datos', methods=['POST'])
@@ -971,24 +973,253 @@ def limpiar_datos_admin():
     
     # Solo admin (rol==3)
     if not user or user.get('rol', 1) != 3:
-        return jsonify({'error': 'No tienes permisos de administrador'}), 403
+        flash('No tienes permisos de administrador', 'error')
+        return redirect(url_for('dashboard'))
     
     try:
-        # Obtener días desde parámetro o usar 3 por defecto
-        dias = int(request.form.get('dias', 3))
+        # Obtener días desde parámetro o usar 7 por defecto
+        dias = int(request.form.get('dias', 7))
         if dias < 1 or dias > 365:
-            return jsonify({'error': 'El número de días debe estar entre 1 y 365'}), 400
+            flash('El número de días debe estar entre 1 y 365', 'error')
+            return redirect(url_for('ajustes_usuario'))
         
         eventos_eliminados, tareas_eliminadas = limpiar_datos_antiguos(dias=dias)
         
-        return jsonify({
-            'success': True,
-            'eventos_eliminados': eventos_eliminados,
-            'tareas_eliminadas': tareas_eliminadas,
-            'mensaje': f'Se eliminaron {eventos_eliminados} eventos y {tareas_eliminadas} tareas con más de {dias} días de antigüedad'
-        }), 200
+        flash(f'Limpieza completada: {eventos_eliminados} eventos y {tareas_eliminadas} tareas eliminadas (>{dias} días)', 'success')
+        return redirect(url_for('ajustes_usuario'))
     except Exception as e:
-        return jsonify({'error': f'Error al limpiar datos: {str(e)}'}), 500
+        flash(f'Error al limpiar datos: {str(e)}', 'error')
+        return redirect(url_for('ajustes_usuario'))
+
+
+@app.route('/admin/eliminar-usuario', methods=['POST'])
+@login_required
+def eliminar_usuario_admin():
+    """Eliminar un usuario (solo admin)."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    
+    if not user or user.get('rol', 1) != 3:
+        flash('No tienes permisos de administrador', 'error')
+        return redirect(url_for('dashboard'))
+    
+    usuario_id = request.form.get('usuario_id')
+    if not usuario_id:
+        flash('ID de usuario no proporcionado', 'error')
+        return redirect(url_for('ajustes_admin'))
+    
+    try:
+        from db import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Verificar que no sea admin (tabla real: usuario)
+        cursor.execute("SELECT rol FROM usuario WHERE id = %s", (usuario_id,))
+        result = cursor.fetchone()
+        if result and result[0] == 3:
+            flash('No puedes eliminar a otro administrador', 'error')
+            cursor.close(); conn.close()
+            return redirect(url_for('ajustes_usuario'))
+
+        # Eliminar eventos y tareas del usuario primero (columnas reales: creador_evento / creador_tarea)
+        cursor.execute("DELETE FROM eventos WHERE creador_evento = %s", (usuario_id,))
+        cursor.execute("DELETE FROM tareas WHERE creador_tarea = %s", (usuario_id,))
+
+        # Eliminar usuario (tabla real: usuario)
+        cursor.execute("DELETE FROM usuario WHERE id = %s", (usuario_id,))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        flash('Usuario eliminado correctamente', 'success')
+    except Exception as e:
+        flash(f'Error al eliminar usuario: {str(e)}', 'error')
+    
+    return redirect(url_for('ajustes_usuario'))
+
+
+@app.route('/admin/eliminar-evento', methods=['POST'])
+@login_required
+def eliminar_evento_admin():
+    """Eliminar un evento (solo admin)."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    
+    if not user or user.get('rol', 1) != 3:
+        flash('No tienes permisos de administrador', 'error')
+        return redirect(url_for('dashboard'))
+    
+    evento_id = request.form.get('evento_id')
+    if not evento_id:
+        flash('ID de evento no proporcionado', 'error')
+        return redirect(url_for('ajustes_usuario'))
+    
+    try:
+        eliminar_evento(int(evento_id))
+        flash('Evento eliminado correctamente', 'success')
+    except Exception as e:
+        flash(f'Error al eliminar evento: {str(e)}', 'error')
+    
+    return redirect(url_for('ajustes_usuario'))
+
+
+@app.route('/admin/eliminar-tarea', methods=['POST'])
+@login_required
+def eliminar_tarea_admin():
+    """Eliminar una tarea (solo admin)."""
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    
+    if not user or user.get('rol', 1) != 3:
+        flash('No tienes permisos de administrador', 'error')
+        return redirect(url_for('dashboard'))
+    
+    tarea_id = request.form.get('tarea_id')
+    if not tarea_id:
+        flash('ID de tarea no proporcionado', 'error')
+        return redirect(url_for('ajustes_usuario'))
+    
+    try:
+        eliminar_tarea(int(tarea_id))
+        flash('Tarea eliminada correctamente', 'success')
+    except Exception as e:
+        flash(f'Error al eliminar tarea: {str(e)}', 'error')
+    
+    return redirect(url_for('ajustes_usuario'))
+
+
+# ------------------ AJUSTES DE USUARIO ------------------
+
+@app.route('/ajustes-usuario', methods=['GET'])
+@login_required
+def ajustes_usuario():
+    """Página de ajustes del usuario: cambiar nombre y contraseña. Si es admin, muestra también opciones de administración."""
+    from db import obtener_usuarios, obtener_eventos, obtener_tareas
+    
+    usuario_actual = session.get('usuario')
+    user = obtener_usuario_por_nombre(usuario_actual)
+    es_admin = user and user.get('rol', 1) == 3
+    
+    admin_data = _build_admin_data() if es_admin else {}
+    return render_template('ajustes_usuario.html', es_admin=es_admin, admin_data=admin_data)
+
+
+@app.route('/cambiar-nombre', methods=['POST'])
+@login_required
+def cambiar_nombre_usuario():
+    """Cambiar el nombre de usuario actual."""
+    from db import obtener_usuario_por_nombre
+    import bcrypt
+    
+    usuario_actual = session.get('usuario')
+    nuevo_nombre = request.form.get('nuevo_nombre', '').strip()
+    password_confirmar = request.form.get('password_confirmar', '').strip()
+    
+    errors = []
+    
+    # Validaciones
+    if not validar_no_vacio(nuevo_nombre):
+        errors.append('El nuevo nombre no puede estar vacío')
+    if not validar_longitud(nuevo_nombre, 50, 3):
+        errors.append('El nombre debe tener entre 3 y 50 caracteres')
+    if not validar_texto_seguro(nuevo_nombre, 50, required=True):
+        errors.append('El nombre contiene caracteres no permitidos')
+    
+    # Verificar que el nuevo nombre no exista
+    user_existente = obtener_usuario_por_nombre(nuevo_nombre)
+    if user_existente and user_existente.get('usuario') != usuario_actual:
+        errors.append('Este nombre de usuario ya está en uso')
+    
+    # Verificar contraseña actual
+    user = obtener_usuario_por_nombre(usuario_actual)
+    if not user:
+        errors.append('Usuario no encontrado')
+    else:
+        password_hash = user.get('password')
+        if not bcrypt.checkpw(password_confirmar.encode('utf-8'), password_hash.encode('utf-8')):
+            errors.append('La contraseña actual es incorrecta')
+    
+    if errors:
+        return render_template('ajustes_usuario.html', errors=errors)
+    
+    # Actualizar el nombre de usuario
+    try:
+        # Nota: necesitarías una función modificar_usuario en db.py
+        # Por ahora voy a usar una consulta directa
+        from db import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE usuario SET usuario = %s WHERE usuario = %s", (nuevo_nombre, usuario_actual))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Actualizar la sesión
+        session['usuario'] = nuevo_nombre
+        # Re-armar contexto ajustes
+        es_admin = user and user.get('rol', 1) == 3
+        admin_data = _build_admin_data() if es_admin else {}
+        return render_template('ajustes_usuario.html', success='Nombre de usuario actualizado correctamente', es_admin=es_admin, admin_data=admin_data)
+    except Exception as e:
+        es_admin = user and user.get('rol', 1) == 3
+        admin_data = _build_admin_data() if es_admin else {}
+        return render_template('ajustes_usuario.html', errors=[f'Error al actualizar el nombre: {str(e)}'], es_admin=es_admin, admin_data=admin_data)
+
+
+@app.route('/cambiar-password', methods=['POST'])
+@login_required
+def cambiar_password():
+    """Cambiar la contraseña del usuario actual."""
+    from db import obtener_usuario_por_nombre, get_connection
+    import bcrypt
+    
+    usuario_actual = session.get('usuario')
+    password_actual = request.form.get('password_actual', '').strip()
+    password_nueva = request.form.get('password_nueva', '').strip()
+    password_nueva_confirmar = request.form.get('password_nueva_confirmar', '').strip()
+    
+    errors = []
+    
+    # Validaciones
+    if not validar_no_vacio(password_actual):
+        errors.append('Debes ingresar tu contraseña actual')
+    if not validar_no_vacio(password_nueva):
+        errors.append('La nueva contraseña no puede estar vacía')
+    if not validar_longitud(password_nueva, 100, 6):
+        errors.append('La nueva contraseña debe tener entre 6 y 100 caracteres')
+    if password_nueva != password_nueva_confirmar:
+        errors.append('Las contraseñas nuevas no coinciden')
+    
+    # Verificar contraseña actual
+    user = obtener_usuario_por_nombre(usuario_actual)
+    if not user:
+        errors.append('Usuario no encontrado')
+    else:
+        password_hash = user.get('password')
+        if not bcrypt.checkpw(password_actual.encode('utf-8'), password_hash.encode('utf-8')):
+            errors.append('La contraseña actual es incorrecta')
+    
+    if errors:
+        return render_template('ajustes_usuario.html', errors=errors)
+    
+    # Actualizar la contraseña
+    try:
+        nueva_hash = bcrypt.hashpw(password_nueva.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE usuario SET password = %s WHERE usuario = %s", (nueva_hash, usuario_actual))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        es_admin = user and user.get('rol', 1) == 3
+        admin_data = _build_admin_data() if es_admin else {}
+        return render_template('ajustes_usuario.html', success='Contraseña actualizada correctamente', es_admin=es_admin, admin_data=admin_data)
+    except Exception as e:
+        es_admin = user and user.get('rol', 1) == 3
+        admin_data = _build_admin_data() if es_admin else {}
+        return render_template('ajustes_usuario.html', errors=[f'Error al actualizar la contraseña: {str(e)}'], es_admin=es_admin, admin_data=admin_data)
 
 
 # ------------------ PÁGINAS INFORMATIVAS ------------------
