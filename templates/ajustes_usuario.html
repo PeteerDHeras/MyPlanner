@@ -144,28 +144,28 @@
         <span>Panel de Administración</span>
       </h2>
 
-      <!-- Tabs de admin -->
+      <!-- Tabs de admin (sin overflow) -->
       <div class="border-b border-gray-300 mb-6">
-        <nav class="-mb-px flex space-x-4">
-          <button onclick="showAdminTab('usuarios')" id="admin-tab-usuarios" class="admin-tab-btn border-b-2 border-purple-500 text-purple-600 py-3 px-1 font-medium text-sm">
+        <nav class="-mb-px flex space-x-4 flex-wrap">
+          <button onclick="showAdminTab('usuarios')" id="admin-tab-usuarios" class="admin-tab-btn border-b-2 border-purple-500 text-purple-600 py-3 px-1 font-medium text-sm whitespace-nowrap">
             <span class="flex items-center gap-2">
               <span class="material-symbols-outlined text-base">group</span>
               Usuarios
             </span>
           </button>
-          <button onclick="showAdminTab('eventos')" id="admin-tab-eventos" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm">
+          <button onclick="showAdminTab('eventos')" id="admin-tab-eventos" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm whitespace-nowrap">
             <span class="flex items-center gap-2">
               <span class="material-symbols-outlined text-base">event</span>
               Eventos
             </span>
           </button>
-          <button onclick="showAdminTab('tareas')" id="admin-tab-tareas" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm">
+          <button onclick="showAdminTab('tareas')" id="admin-tab-tareas" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm whitespace-nowrap">
             <span class="flex items-center gap-2">
               <span class="material-symbols-outlined text-base">task</span>
               Tareas
             </span>
           </button>
-          <button onclick="showAdminTab('limpieza')" id="admin-tab-limpieza" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm">
+          <button onclick="showAdminTab('limpieza')" id="admin-tab-limpieza" class="admin-tab-btn border-b-2 border-transparent text-gray-500 hover:text-gray-700 py-3 px-1 font-medium text-sm whitespace-nowrap">
             <span class="flex items-center gap-2">
               <span class="material-symbols-outlined text-base">cleaning_services</span>
               Limpieza
@@ -174,11 +174,11 @@
         </nav>
       </div>
 
-      <!-- Panel: Usuarios -->
+      <!-- Panel: Usuarios (con scroll) -->
       <div id="admin-panel-usuarios" class="admin-tab-content">
-        <div class="overflow-x-auto">
+        <div class="overflow-y-auto" style="max-height: 400px;">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-100">
+            <thead class="bg-gray-100 sticky top-0 z-10">
               <tr>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">ID</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Usuario</th>
@@ -200,7 +200,7 @@
                 </td>
                 <td class="px-4 py-2">
                   {% if u.rol != 3 %}
-                  <form method="POST" action="{{ url_for('eliminar_usuario_admin') }}" class="inline" onsubmit="return confirm('¿Eliminar usuario {{ u.usuario }}?')">
+                  <form method="POST" action="{{ url_for('eliminar_usuario_admin') }}" class="inline" onsubmit="return confirm('¿Eliminar usuario {{ u.usuario }} y todos sus eventos y tareas?')">
                     <input type="hidden" name="usuario_id" value="{{ u.id }}">
                     <button type="submit" class="text-red-600 hover:text-red-900">
                       <span class="material-symbols-outlined text-sm">delete</span>
@@ -217,11 +217,22 @@
         </div>
       </div>
 
-      <!-- Panel: Eventos -->
+      <!-- Panel: Eventos (con filtro y scroll) -->
       <div id="admin-panel-eventos" class="admin-tab-content hidden">
-        <div class="overflow-x-auto">
+        <!-- Filtro por usuario -->
+        <div class="mb-4">
+          <label for="filtro-usuario-eventos" class="block text-sm font-medium text-gray-700 mb-2">Filtrar por usuario:</label>
+          <select id="filtro-usuario-eventos" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white" onchange="filtrarEventos()">
+            <option value="">-- Todos los usuarios --</option>
+            {% for u in admin_data.usuarios %}
+              <option value="{{ u.id }}">{{ u.usuario }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="overflow-y-auto" style="max-height: 400px;">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-100">
+            <thead class="bg-gray-100 sticky top-0 z-10">
               <tr>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">ID</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Nombre</th>
@@ -230,9 +241,9 @@
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Acciones</th>
               </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="bg-white divide-y divide-gray-200" id="eventos-tbody">
               {% for e in admin_data.eventos %}
-              <tr>
+              <tr data-creador-id="{{ e.creador_evento }}" class="evento-row">
                 <td class="px-4 py-2 text-gray-900">{{ e.id }}</td>
                 <td class="px-4 py-2 text-gray-900">{{ e.nombre }}</td>
                 <td class="px-4 py-2 text-gray-600">{{ e.fecha_evento }}</td>
@@ -247,18 +258,29 @@
                 </td>
               </tr>
               {% else %}
-              <tr><td colspan="5" class="px-4 py-3 text-center text-gray-500">No hay eventos</td></tr>
+              <tr id="no-eventos-row"><td colspan="5" class="px-4 py-3 text-center text-gray-500">No hay eventos</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Panel: Tareas -->
+      <!-- Panel: Tareas (con filtro y scroll) -->
       <div id="admin-panel-tareas" class="admin-tab-content hidden">
-        <div class="overflow-x-auto">
+        <!-- Filtro por usuario -->
+        <div class="mb-4">
+          <label for="filtro-usuario-tareas" class="block text-sm font-medium text-gray-700 mb-2">Filtrar por usuario:</label>
+          <select id="filtro-usuario-tareas" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white" onchange="filtrarTareas()">
+            <option value="">-- Todos los usuarios --</option>
+            {% for u in admin_data.usuarios %}
+              <option value="{{ u.id }}">{{ u.usuario }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="overflow-y-auto" style="max-height: 400px;">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-100">
+            <thead class="bg-gray-100 sticky top-0 z-10">
               <tr>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">ID</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Nombre</th>
@@ -268,9 +290,9 @@
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Acciones</th>
               </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="bg-white divide-y divide-gray-200" id="tareas-tbody">
               {% for t in admin_data.tareas %}
-              <tr>
+              <tr data-creador-id="{{ t.creador_tarea }}" class="tarea-row">
                 <td class="px-4 py-2 text-gray-900">{{ t.id }}</td>
                 <td class="px-4 py-2 text-gray-900">{{ t.nombre }}</td>
                 <td class="px-4 py-2 text-gray-600">{{ t.fecha_limite }}</td>
@@ -292,7 +314,7 @@
                 </td>
               </tr>
               {% else %}
-              <tr><td colspan="6" class="px-4 py-3 text-center text-gray-500">No hay tareas</td></tr>
+              <tr id="no-tareas-row"><td colspan="6" class="px-4 py-3 text-center text-gray-500">No hay tareas</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -353,6 +375,48 @@
       const activeTab = document.getElementById('admin-tab-' + tabName);
       activeTab.classList.remove('border-transparent', 'text-gray-500');
       activeTab.classList.add('border-purple-500', 'text-purple-600');
+    }
+    
+    function filtrarEventos() {
+      const filtro = document.getElementById('filtro-usuario-eventos').value;
+      const rows = document.querySelectorAll('.evento-row');
+      let visibleCount = 0;
+      
+      rows.forEach(row => {
+        if (!filtro || row.dataset.creadorId === filtro) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+      
+      // Mostrar mensaje si no hay resultados
+      const noEventosRow = document.getElementById('no-eventos-row');
+      if (noEventosRow) {
+        noEventosRow.style.display = visibleCount === 0 ? '' : 'none';
+      }
+    }
+    
+    function filtrarTareas() {
+      const filtro = document.getElementById('filtro-usuario-tareas').value;
+      const rows = document.querySelectorAll('.tarea-row');
+      let visibleCount = 0;
+      
+      rows.forEach(row => {
+        if (!filtro || row.dataset.creadorId === filtro) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+      
+      // Mostrar mensaje si no hay resultados
+      const noTareasRow = document.getElementById('no-tareas-row');
+      if (noTareasRow) {
+        noTareasRow.style.display = visibleCount === 0 ? '' : 'none';
+      }
     }
     </script>
     {% endif %}

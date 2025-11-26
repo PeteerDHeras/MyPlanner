@@ -7,6 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <title>{% block title %}MyPlanner{% endblock %}</title>
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/logo.svg') }}">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
       <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
@@ -40,6 +44,12 @@
         <aside role="complementary" aria-label="Sidebar" id="sidebar" class="bg-dark text-light flex-shrink-0 p-3 sidebar-responsive"
             style="width:16rem;transition:left 0.3s;left:0;z-index:1090;">
             <div class="d-flex flex-column" style="gap:.75rem;">
+                <!-- Logo de MyPlanner -->
+                <div class="d-flex align-items-center gap-2 mb-3 pb-3 border-bottom" style="border-color: #495057 !important;">
+                    <img src="{{ url_for('static', filename='img/logo-white.svg') }}" alt="MyPlanner Logo" style="width:40px; height:40px;">
+                    <h1 class="h5 mb-0 fw-bold" style="background: linear-gradient(to right, #A855F7, #DB2777); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">MyPlanner</h1>
+                </div>
+                
                 <!-- Usuario  -->
                 <div class="d-flex align-items-center gap-3 mb-2">
                     <div class="rounded-circle"

@@ -118,6 +118,15 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Maneja formulario de login y crea la sesión del usuario."""
+    # Si ya hay sesión activa válida, ir directo al dashboard
+    usuario = session.get('usuario')
+    token = session.get('session_token')
+    if usuario and token:
+        data = ACTIVE_USER_SESSIONS.get(usuario)
+        if data and data.get('token') == token:
+            # Sesión válida, redirigir a dashboard
+            return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
         usuario = sanitizar_texto(request.form.get('usuario', ''))
         password = request.form.get('password', '')
